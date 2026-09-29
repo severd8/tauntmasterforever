@@ -17,78 +17,233 @@ local function Label(parent, text, x, y, template)
     return fs
 end
 
-local function Check(parent, text, x, y, key, template, invert)
-    local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    cb:SetSize(24, 24)
-    cb:SetPoint("TOPLEFT", x, y)
-    local fs = parent:CreateFontString(nil, "OVERLAY", template or "GameFontHighlight")
-    fs:SetPoint("LEFT", cb, "RIGHT", 2, 0)
-    fs:SetText(text)
-    cb:SetScript("OnClick", function(self)
-        local v = self:GetChecked() and true or false
-        if invert then v = not v end
-        if key == "locked" then
-            TM:SetLocked(v)
-        else
-            TM.db[key] = v
-            TM:ApplySettings()
-        end
-    end)
-    AddRefresher(function()
-        local v = TM.db[key] and true or false
-        if invert then v = not v end
-        cb:SetChecked(v)
-    end)
-    return cb
+
+
+
+
+
+
+---------------------------------------------------------------------------
+-- Theme: flat dark panels, gold text, red accents
+---------------------------------------------------------------------------
+local C = {
+    win     = { 0.07, 0.063, 0.063, 0.98 },
+    side    = { 0.047, 0.04, 0.04, 1 },
+    card    = { 0.10, 0.086, 0.078, 1 },
+    field   = { 0.055, 0.047, 0.043, 1 },
+    line    = { 0.17, 0.14, 0.10, 1 },
+    edge    = { 0.35, 0.29, 0.19, 1 },
+    fieldEdge = { 0.29, 0.24, 0.16, 1 },
+    red     = { 0.48, 0.11, 0.06, 1 },
+    redHi   = { 0.62, 0.16, 0.08, 1 },
+    btnEdge = { 0.72, 0.53, 0.23, 1 },
+    offTrack = { 0.23, 0.20, 0.19, 1 },
+    onTrack = { 0.55, 0.14, 0.08, 1 },
+    gold    = { 1, 0.82, 0, 1 },
+    grey    = { 0.54, 0.50, 0.47, 1 },
+    orange  = { 0.91, 0.63, 0.25 },
+    muted   = { 0.81, 0.77, 0.68 },
+}
+
+local function Fill(frame, color, layer, sub)
+    local t = frame:CreateTexture(nil, layer or "BACKGROUND", nil, sub or -8)
+    t:SetAllPoints()
+    t:SetColorTexture(unpack(color))
+    return t
 end
 
-local function Slider(parent, text, y, key, min, max, suffix, onChange, x, step, fmt)
-    suffix = suffix or ""
-    step = step or 1
-    fmt = fmt or "%d"
-    local title = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    if x then
-        title:SetPoint("TOP", parent, "TOPLEFT", x, y)
-    else
-        title:SetPoint("TOP", 0, y)
+local function Border(frame, color)
+    local edges = {}
+    for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+        local t = frame:CreateTexture(nil, "BORDER")
+        t:SetColorTexture(unpack(color))
+        if side == "TOP" or side == "BOTTOM" then
+            t:SetPoint(side .. "LEFT"); t:SetPoint(side .. "RIGHT"); t:SetHeight(1)
+        else
+            t:SetPoint("TOP" .. side); t:SetPoint("BOTTOM" .. side); t:SetWidth(1)
+        end
+        edges[#edges + 1] = t
     end
+    return edges
+end
 
-    local s = CreateFrame("Slider", nil, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-    s:SetOrientation("HORIZONTAL")
-    s:SetSize(180, 17)
-    s:SetPoint("TOP", title, "BOTTOM", 0, -3)
-    s:SetHitRectInsets(0, 0, -8, -8)
-    if s.SetBackdrop and BACKDROP_SLIDER_8_8 then
-        s:SetBackdrop(BACKDROP_SLIDER_8_8)
-    else
-        local track = s:CreateTexture(nil, "BACKGROUND")
-        track:SetColorTexture(0, 0, 0, 0.6)
-        track:SetHeight(6)
-        track:SetPoint("LEFT")
-        track:SetPoint("RIGHT")
+local function Text(parent, text, template, color, size)
+    local fs = parent:CreateFontString(nil, "OVERLAY", template or "GameFontHighlight")
+    if size then
+        local font, _, flags = fs:GetFont()
+        if font then fs:SetFont(font, size, flags) end
     end
-    s:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+    if color then fs:SetTextColor(color[1], color[2], color[3]) end
+    fs:SetJustifyH("LEFT")
+    fs:SetText(text or "")
+    return fs
+end
+
+-- Flat red button with gold text
+local function FlatButton(parent, text, width, height)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(width or 100, height or 22)
+    b.bg = Fill(b, C.red)
+    Border(b, C.btnEdge)
+    local fs = Text(b, "", "GameFontNormal")
+    fs:SetPoint("CENTER")
+    fs:SetJustifyH("CENTER")
+    b:SetFontString(fs)
+    b:SetText(text)
+    b:SetScript("OnEnter", function(self) self.bg:SetColorTexture(unpack(C.redHi)) end)
+    b:SetScript("OnLeave", function(self) self.bg:SetColorTexture(unpack(C.red)) end)
+    return b
+end
+
+-- Card: a panel with a small orange uppercase title. Content starts at y = -28.
+local function Card(parent, title, x, y, w, h)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetPoint("TOPLEFT", x, y)
+    f:SetSize(w, h)
+    Fill(f, C.card)
+    Border(f, C.line)
+    local t = Text(f, title and title:upper() or "", "GameFontNormalSmall", C.orange)
+    t:SetPoint("TOPLEFT", 12, -10)
+    return f
+end
+
+local function MutedNote(parent, text, x, y, width)
+    local n = Text(parent, text, "GameFontDisableSmall")
+    n:SetPoint("TOPLEFT", x, y)
+    if width then n:SetWidth(width); n:SetWordWrap(true) end
+    return n
+end
+
+local function RowLabel(parent, text, x, y)
+    local fs = Text(parent, text, "GameFontHighlight", C.muted)
+    fs:SetPoint("TOPLEFT", x, y - 4)
+    return fs
+end
+
+-- On/off switch. invert = the switch shows the opposite of the saved setting.
+-- onChange(v) runs after saving; default re-applies all settings.
+local function Switch(parent, text, x, y, key, invert, labelWidth, onChange)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(30, 16)
+    b:SetPoint("TOPLEFT", x, y)
+    b.isSwitch = true
+    local track = b:CreateTexture(nil, "BACKGROUND")
+    track:SetAllPoints()
+    local knob = b:CreateTexture(nil, "ARTWORK")
+    knob:SetSize(12, 12)
+    local label = Text(parent, text, "GameFontHighlight")
+    label:SetPoint("TOPLEFT", b, "TOPRIGHT", 8, 1)
+    if labelWidth then label:SetWidth(labelWidth); label:SetWordWrap(true) end
+
+    local function shown()
+        local v = TM.db[key] and true or false
+        if invert then v = not v end
+        return v
+    end
+    local function paint()
+        local on = shown()
+        track:SetColorTexture(unpack(on and C.onTrack or C.offTrack))
+        knob:SetColorTexture(unpack(on and C.gold or C.grey))
+        knob:ClearAllPoints()
+        knob:SetPoint("LEFT", b, "LEFT", on and 16 or 2, 0)
+    end
+    b:SetScript("OnClick", function()
+        local on = not shown()
+        local stored = on
+        if invert then stored = not on end
+        if key == "locked" then
+            TM:SetLocked(stored)
+        else
+            TM.db[key] = stored
+            if onChange then onChange(stored) else TM:ApplySettings() end
+        end
+        paint()
+    end)
+    b.paint = paint
+    AddRefresher(paint)
+    return b, label
+end
+
+-- Dropdown: shows the current choice; click for a menu of options.
+local function Dropdown(parent, width, keys, labels, getter, setter)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(width, 22)
+    Fill(b, C.field)
+    Border(b, C.fieldEdge)
+    local fs = Text(b, "", "GameFontHighlightSmall")
+    fs:SetPoint("LEFT", 8, 0)
+    fs:SetPoint("RIGHT", -20, 0)
+    b:SetFontString(fs)
+    local arrow = b:CreateTexture(nil, "OVERLAY")
+    arrow:SetSize(12, 12)
+    arrow:SetPoint("RIGHT", -6, 0)
+    arrow:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
+    arrow:SetVertexColor(0.91, 0.63, 0.25)
+
+    local function label(k) return labels[k] or tostring(k) end
+    local function refresh() b:SetText(label(getter())) end
+    local function choose(k) setter(k); refresh() end
+    b:SetScript("OnClick", function(self)
+        if MenuUtil and MenuUtil.CreateContextMenu then
+            MenuUtil.CreateContextMenu(self, function(_, root)
+                for _, k in ipairs(keys) do
+                    root:CreateRadio(label(k), function() return getter() == k end, function() choose(k) end)
+                end
+            end)
+        else
+            -- No menu system: step to the next choice
+            local cur, nextIdx = getter(), 1
+            for i, k in ipairs(keys) do
+                if k == cur then nextIdx = (i % #keys) + 1 break end
+            end
+            choose(keys[nextIdx])
+        end
+    end)
+    b.Refresh = refresh
+    b.Choose = choose
+    return b
+end
+
+-- Flat slider: label on the left, value on the right, thin track with a gold knob
+local function FlatSlider(parent, text, x, y, width, key, min, max, suffix, onChange, step, fmt)
+    suffix, step, fmt = suffix or "", step or 1, fmt or "%d"
+    local title = Text(parent, text, "GameFontHighlight", C.muted)
+    title:SetPoint("TOPLEFT", x, y)
+    local value = Text(parent, "", "GameFontNormal")
+    value:SetPoint("TOPRIGHT", parent, "TOPLEFT", x + width, y)
+    value:SetJustifyH("RIGHT")
+
+    local s = CreateFrame("Slider", nil, parent)
+    s:SetOrientation("HORIZONTAL")
+    s:SetSize(width, 14)
+    s:SetPoint("TOPLEFT", x, y - 18)
+    s:SetHitRectInsets(0, 0, -6, -6)
+    local track = s:CreateTexture(nil, "BACKGROUND")
+    track:SetHeight(4)
+    track:SetPoint("LEFT"); track:SetPoint("RIGHT")
+    track:SetColorTexture(unpack(C.offTrack))
+    local thumb = s:CreateTexture(nil, "OVERLAY")
+    thumb:SetSize(10, 14)
+    thumb:SetColorTexture(unpack(C.gold))
+    s:SetThumbTexture(thumb)
+    local fill = s:CreateTexture(nil, "ARTWORK")
+    fill:SetHeight(4)
+    fill:SetPoint("LEFT", track, "LEFT")
+    fill:SetPoint("RIGHT", thumb, "CENTER")
+    fill:SetColorTexture(0.72, 0.2, 0.11, 1)
     s:SetMinMaxValues(min, max)
     s:SetValueStep(step)
     if s.SetObeyStepsOnDrag then s:SetObeyStepsOnDrag(true) end
 
-    local low = s:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    low:SetPoint("TOPLEFT", s, "BOTTOMLEFT", 0, 0)
-    low:SetText(min)
-    local high = s:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    high:SetPoint("TOPRIGHT", s, "BOTTOMRIGHT", 0, 0)
-    high:SetText(max)
-
     s:SetScript("OnValueChanged", function(_, v)
         v = math.floor(v / step + 0.5) * step
         if step >= 1 then v = math.floor(v + 0.5) end
-        title:SetText(text .. ": |cffffd100" .. fmt:format(v) .. suffix .. "|r")
+        value:SetText(fmt:format(v) .. suffix)
         if TM.db[key] ~= v then
             TM.db[key] = v
             if onChange then
                 onChange()
             else
-                -- Size/layout sliders: re-layout (once, after combat if needed) and resize role icons
                 TM:ApplyFonts()
                 TM:RequestLayout()
             end
@@ -96,84 +251,23 @@ local function Slider(parent, text, y, key, min, max, suffix, onChange, x, step,
     end)
     AddRefresher(function()
         s:SetValue(TM.db[key])
-        title:SetText(text .. ": |cffffd100" .. fmt:format(TM.db[key]) .. suffix .. "|r")
+        value:SetText(fmt:format(TM.db[key]) .. suffix)
     end)
     return s
 end
 
-local function Stepper(parent, text, x, y, key, step, min, max, fmt)
-    Label(parent, text, x, y - 4)
-    local value = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    value:SetPoint("TOPLEFT", x + 110, y - 4)
-    value:SetWidth(40)
-    local function set(v)
-        v = math.max(min, math.min(max, v))
-        v = math.floor(v / step + 0.5) * step
-        TM.db[key] = v
-        value:SetText(fmt:format(v))
-        TM:ApplySettings()
-    end
-    local minus = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    minus:SetSize(24, 20)
-    minus:SetPoint("TOPLEFT", x + 155, y)
-    minus:SetText("-")
-    minus:SetScript("OnClick", function() set(TM.db[key] - step) end)
-    local plus = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    plus:SetSize(24, 20)
-    plus:SetPoint("LEFT", minus, "RIGHT", 2, 0)
-    plus:SetText("+")
-    plus:SetScript("OnClick", function() set(TM.db[key] + step) end)
-    AddRefresher(function() value:SetText(fmt:format(TM.db[key])) end)
-end
-
-local function Cycle(parent, width, list, labels, getter, setter)
-    local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    b:SetSize(width, 22)
-    local function refresh() b:SetText(labels[getter()] or getter()) end
-    b:SetScript("OnClick", function()
-        local cur, nextIdx = getter(), 1
-        for i, v in ipairs(list) do
-            if v == cur then nextIdx = (i % #list) + 1 break end
-        end
-        setter(list[nextIdx])
-        refresh()
-    end)
-    b.Refresh = refresh
-    return b
-end
-
-local function EditBox(parent, width)
-    local eb = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
-    eb:SetSize(width, 20)
+-- Flat text box
+local function FlatEditBox(parent, width)
+    local eb = CreateFrame("EditBox", nil, parent)
+    eb:SetSize(width, 22)
     eb:SetAutoFocus(false)
+    eb:SetFontObject(GameFontHighlightSmall)
+    eb:SetTextInsets(6, 6, 0, 0)
+    Fill(eb, C.field)
+    Border(eb, C.fieldEdge)
     eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
     return eb
-end
-
-local function Window(name, title, w, h)
-    local f = CreateFrame("Frame", name, UIParent, "BasicFrameTemplateWithInset")
-    f:SetSize(w, h)
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    f:SetToplevel(true)
-    local solid = f:CreateTexture(nil, "BACKGROUND", nil, -8)
-    solid:SetPoint("TOPLEFT", 2, -2)
-    solid:SetPoint("BOTTOMRIGHT", -2, 2)
-    solid:SetColorTexture(0.06, 0.06, 0.06, 1)
-    f:SetMovable(true)
-    f:SetClampedToScreen(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    f:SetScript("OnShow", RunRefreshers)
-    f:Hide()
-    table.insert(UISpecialFrames, name)
-    local t = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    t:SetPoint("TOP", 0, -5)
-    t:SetText(title)
-    return f
 end
 
 ---------------------------------------------------------------------------
@@ -368,25 +462,12 @@ local function ShowSpellMenu(owner, key)
     end)
 end
 
-local function SpellButton(parent, text, x, y, key)
-    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    fs:SetPoint("TOPLEFT", x, y)
-    fs:SetText(text)
-    local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    b:SetSize(220, 24)
-    b:SetPoint("TOPLEFT", fs, "BOTTOMLEFT", 0, -4)
-    b:SetScript("OnClick", function(self) ShowSpellMenu(self, key) end)
-    AddRefresher(function() b:SetText(BindingText(key)) end)
-    return b
-end
 
 ---------------------------------------------------------------------------
--- One options window: a single scrolling page divided into sections
+-- Options window state
 ---------------------------------------------------------------------------
 local win
 local spellRows = {}
-local L_X, R_X = 16, 290          -- left / right column start
-local L_MID, R_MID = 140, 414     -- slider centers
 
 -- Click Bindings: every mouse button + modifier
 local STATUS_TEX = {
@@ -636,16 +717,16 @@ local function SaveSpellRows()
 end
 
 local function BuildBindingsSection(page, top)
-    Label(page, "Click", 16, top, "GameFontNormalSmall")
-    Label(page, "Action", 110, top, "GameFontNormalSmall")
-    Label(page, "Spell name or macro (use {unit} for the member)", 290, top, "GameFontNormalSmall")
+    Text(page, "CLICK", "GameFontNormalSmall", C.orange):SetPoint("TOPLEFT", 0, top)
+    Text(page, "ACTION", "GameFontNormalSmall", C.orange):SetPoint("TOPLEFT", 96, top)
+    Text(page, "SPELL NAME OR MACRO  ({unit} = the player)", "GameFontNormalSmall", C.orange):SetPoint("TOPLEFT", 280, top)
 
     local y = top - 18
     for _, mod in ipairs(TM.MODS) do
         for _, b in ipairs(TM.BUTTONS) do
             local row = { key = mod .. b.id, kind = "none", label = TM.MOD_LABELS[mod] .. b.label }
-            Label(page, TM.MOD_LABELS[mod] .. b.label, 16, y - 4)
-            row.cycle = Cycle(page, 170, TM.KINDS, TM.KIND_LABELS,
+            RowLabel(page, TM.MOD_LABELS[mod] .. b.label, 0, y)
+            row.cycle = Dropdown(page, 172, TM.KINDS, TM.KIND_LABELS,
                 function() return row.kind end,
                 function(v)
                     row.kind = v
@@ -655,10 +736,10 @@ local function BuildBindingsSection(page, top)
                     UpdateRowStatus(row)
                     HideSuggest()
                 end)
-            row.cycle:SetPoint("TOPLEFT", 110, y)
+            row.cycle:SetPoint("TOPLEFT", 96, y)
             row.page = page
-            row.edit = EditBox(page, 184)
-            row.edit:SetPoint("TOPLEFT", 294, y - 1)
+            row.edit = FlatEditBox(page, 200)
+            row.edit:SetPoint("TOPLEFT", 280, y)
             row.status = StatusIcon(page)
             row.status:SetPoint("LEFT", row.edit, "RIGHT", 6, 0)
             WireSpellBox(row)
@@ -667,16 +748,12 @@ local function BuildBindingsSection(page, top)
         end
     end
 
-    local save = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-    save:SetSize(100, 22)
-    save:SetPoint("TOPLEFT", 16, y - 8)
-    save:SetText("Save")
+    local save = FlatButton(page, "Save", 100)
+    save:SetPoint("TOPLEFT", 0, y - 8)
     save:SetScript("OnClick", SaveSpellRows)
 
-    local defaults = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-    defaults:SetSize(130, 22)
+    local defaults = FlatButton(page, "Class defaults", 130)
     defaults:SetPoint("LEFT", save, "RIGHT", 8, 0)
-    defaults:SetText("Class defaults")
     defaults:SetScript("OnClick", function()
         TM.db.bindings[TM:PlayerClass()] = TM:DefaultBindings()
         TM:ApplyBindings()
@@ -684,15 +761,13 @@ local function BuildBindingsSection(page, top)
         TM.Print("click bindings reset to class defaults.")
     end)
 
-    local check = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-    check:SetSize(110, 22)
+    local check = FlatButton(page, "Check spells", 110)
     check:SetPoint("LEFT", defaults, "RIGHT", 8, 0)
-    check:SetText("Check spells")
     check:SetScript("OnClick", function() TM:CheckSpells() end)
 
     bindingsMsg = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     bindingsMsg:SetPoint("TOPLEFT", save, "BOTTOMLEFT", 0, -8)
-    bindingsMsg:SetPoint("RIGHT", page, "RIGHT", -16, 0)
+    bindingsMsg:SetPoint("RIGHT", page, "RIGHT", 0, 0)
     bindingsMsg:SetJustifyH("LEFT")
     bindingsMsg:SetText("")
     TM._bindingsMsg = bindingsMsg
@@ -701,235 +776,336 @@ local function BuildBindingsSection(page, top)
 end
 
 ---------------------------------------------------------------------------
--- Sections. Each builds inside its own frame and returns its height.
+-- Tabs. Each builds its page and positions cards inside it.
+-- Page content area is about 540 x 420.
 ---------------------------------------------------------------------------
-local SMALL = "GameFontHighlightSmall"
+local PAGE_W = 540
+local HALF_W = 265
 
-local function Note(page, text, x, y)
-    local n = Label(page, text, x, y, "GameFontDisableSmall")
-    n:SetJustifyH("LEFT")
-    return n
+-- Spell picker styled like a dropdown, with the spell's icon
+local function SpellSelector(parent, x, y, w, key)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(w, 32)
+    b:SetPoint("TOPLEFT", x, y)
+    Fill(b, C.field)
+    Border(b, C.fieldEdge)
+    local icon = b:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(22, 22)
+    icon:SetPoint("LEFT", 6, 0)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    local fs = Text(b, "", "GameFontHighlight")
+    fs:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+    fs:SetPoint("RIGHT", -20, 0)
+    b:SetFontString(fs)
+    local arrow = b:CreateTexture(nil, "OVERLAY")
+    arrow:SetSize(12, 12)
+    arrow:SetPoint("RIGHT", -8, 0)
+    arrow:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
+    arrow:SetVertexColor(0.91, 0.63, 0.25)
+    b:SetScript("OnClick", function(self) ShowSpellMenu(self, key) end)
+    AddRefresher(function()
+        b:SetText(BindingText(key))
+        local bind = TM:GetBindings()[key]
+        local info = bind and bind.text ~= "" and C_Spell and C_Spell.GetSpellInfo(bind.text)
+        icon:SetTexture(info and info.iconID or "Interface\\Icons\\INV_Misc_QuestionMark")
+    end)
+    return b
 end
 
-local function RowLabel(page, text, x, y)
-    return Label(page, text, x, y - 4, "GameFontNormal")
+local function BuildTauntsTab(p)
+    local left = Card(p, "Left click", 0, 0, HALF_W, 96)
+    SpellSelector(left, 12, -30, HALF_W - 24, "1")
+    MutedNote(left, "Taunts the clicked player's target", 12, -70, HALF_W - 24)
+    local right = Card(p, "Right click", HALF_W + 10, 0, HALF_W, 96)
+    SpellSelector(right, 12, -30, HALF_W - 24, "2")
+    MutedNote(right, "More buttons and modifiers: Click Bindings tab", 12, -70, HALF_W - 24)
+
+    local ann = Card(p, "Announcements", 0, -106, PAGE_W, 122)
+    RowLabel(ann, "Channel", 12, -30)
+    local chan = Dropdown(ann, 170, TM.ANNOUNCE_CHANNELS, TM.ANNOUNCE_LABELS,
+        function() return TM.db.announceChannel end,
+        function(v) TM.db.announceChannel = v end)
+    chan:SetPoint("TOPLEFT", 120, -28)
+    AddRefresher(chan.Refresh)
+    RowLabel(ann, "Message", 12, -58)
+    local msg = FlatEditBox(ann, PAGE_W - 132)
+    msg:SetPoint("TOPLEFT", 120, -56)
+    msg:SetScript("OnEditFocusLost", function(self) TM.db.announceText = self:GetText() end)
+    AddRefresher(function() msg:SetText(TM.db.announceText or "") end)
+    MutedNote(ann, "{target} = the mob, {player} = the player you saved. Sent only when the taunt casts.", 120, -84, PAGE_W - 132)
+
+    local tot = Card(p, "Target's target", 0, -238, PAGE_W, 76)
+    Switch(tot, "Show your target's target bar", 12, -30, "showToT")
+    MutedNote(tot, "Shows who your target is hitting. Click it to taunt your own target.", 50, -52)
 end
 
-local SECTIONS = {
-    { key = "spells", title = "Taunt Spells",
-      sub = "Click a button to pick from your class's taunts. More buttons and modifiers are under Click Bindings.",
-      build = function(p, top)
-          SpellButton(p, "Left Click Spell", L_X, top, "1")
-          SpellButton(p, "Right Click Spell", R_X, top, "2")
-          return -top + 56
-      end },
+local function BuildBindingsTab(p)
+    BuildBindingsSection(p, 0)
+end
 
-    { key = "layout", title = "Layout",
-      sub = "Size and position changes wait until combat ends.",
-      build = function(p, top)
-          Slider(p, "Button Width", top, "width", 50, 200, nil, nil, L_MID)
-          Slider(p, "Button Height", top - 50, "height", 20, 60, nil, nil, L_MID)
-          Slider(p, "Units Per Column", top - 100, "unitsPerColumn", 1, 20, nil, nil, L_MID)
-          Slider(p, "Max Columns", top - 0, "maxColumns", 1, 8, nil, nil, R_MID)
-          Slider(p, "Spacing", top - 50, "spacing", 0, 10, nil, nil, R_MID)
-          Slider(p, "Scale", top - 100, "scale", 0.5, 2, nil, nil, R_MID, 0.05, "%.2f")
-          local y = top - 150
-          Check(p, "Lock frame", L_X, y, "locked", SMALL)
-          Check(p, "Include yourself", L_X, y - 24, "showPlayer", SMALL)
-          Check(p, "Show in raids", L_X, y - 48, "showInRaid", SMALL)
-          Check(p, "Hide when solo", R_X, y, "showSolo", SMALL, true)
-          Check(p, "Only in Defensive Stance / Bear Form", R_X, y - 24, "tankOnly", SMALL)
-          Check(p, "Sort by role (tanks, healers, damage)", R_X, y - 48, "sortByRole", SMALL)
-          local reset = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-          reset:SetSize(130, 22)
-          reset:SetPoint("TOPLEFT", L_X, y - 80)
-          reset:SetText("Reset position")
-          reset:SetScript("OnClick", function() SlashCmdList.TAUNTMASTERFOREVER("reset") end)
-          return -(y - 80) + 30
-      end },
+local function BuildLayoutTab(p)
+    local size = Card(p, "Size", 0, 0, PAGE_W, 170)
+    local lx, rx, sw = 12, 284, 244
+    FlatSlider(size, "Button width", lx, -30, sw, "width", 50, 200)
+    FlatSlider(size, "Button height", lx, -76, sw, "height", 20, 60)
+    FlatSlider(size, "Units per column", lx, -122, sw, "unitsPerColumn", 1, 20)
+    FlatSlider(size, "Max columns", rx, -30, sw, "maxColumns", 1, 8)
+    FlatSlider(size, "Spacing", rx, -76, sw, "spacing", 0, 10)
+    FlatSlider(size, "Scale", rx, -122, sw, "scale", 0.5, 2, nil, nil, 0.05, "%.2f")
 
-    { key = "appearance", title = "Appearance",
-      build = function(p, top)
-          Check(p, "Class colors for names", L_X, top, "classColors", SMALL)
-          Check(p, "Role icons", L_X, top - 24, "roleIcons", SMALL)
-          Check(p, "Health % instead of aggro words", L_X, top - 48, "healthText", SMALL)
-          RowLabel(p, "Bar texture", R_X, top)
-          local tex = Cycle(p, 120, TM.TEXTURE_KEYS, TM.TEXTURE_LABELS,
-              function() return TM.db.barTexture end,
-              function(v) TM.db.barTexture = v; TM:ApplyFonts() end)
-          tex:SetPoint("TOPLEFT", R_X + 100, top + 2)
-          AddRefresher(tex.Refresh)
-          Slider(p, "Header Text Size", top - 32, "headerFontSize", 8, 20, nil, function() TM:ApplyFonts() end, R_MID)
-          Slider(p, "Member Text Size", top - 82, "nameFontSize", 8, 20, nil, function() TM:ApplyFonts() end, R_MID)
-          return -(top - 82) + 50
-      end },
+    local vis = Card(p, "Visibility & order", 0, -180, PAGE_W, 150)
+    Switch(vis, "Lock frame", 12, -30, "locked")
+    Switch(vis, "Include yourself", 12, -56, "showPlayer")
+    Switch(vis, "Show in raids", 12, -82, "showInRaid")
+    Switch(vis, "Hide when solo", 284, -30, "showSolo", true)
+    Switch(vis, "Only in Defensive Stance / Bear Form", 284, -56, "tankOnly", false, 210)
+    Switch(vis, "Sort by role", 284, -90, "sortByRole")
+    local reset = FlatButton(vis, "Reset position", 130)
+    reset:SetPoint("TOPLEFT", 12, -114)
+    reset:SetScript("OnClick", function() SlashCmdList.TAUNTMASTERFOREVER("reset") end)
+    MutedNote(vis, "Size and position changes wait until combat ends.", 154, -119)
+end
 
-    { key = "aggro", title = "Aggro Alerts",
-      sub = "For anyone other than you or another tank.",
-      build = function(p, top)
-          Check(p, "Flash bar while they have aggro", L_X, top, "flashAggro", SMALL)
-          Check(p, "Play a sound", L_X, top - 24, "aggroSound", SMALL)
-          local cx = R_X + 90
-          RowLabel(p, "Sound", R_X, top)
-          local snd = Cycle(p, 120, TM.AGGRO_SOUND_KEYS, TM.AGGRO_SOUND_LABELS,
-              function() return TM.db.aggroSoundKey end,
-              function(v) TM.db.aggroSoundKey = v; TM:TestAggroSound() end)
-          snd:SetPoint("TOPLEFT", cx, top + 2)
-          AddRefresher(snd.Refresh)
-          local test = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
-          test:SetSize(50, 22)
-          test:SetPoint("LEFT", snd, "RIGHT", 4, 0)
-          test:SetText("Test")
-          test:SetScript("OnClick", function() TM:TestAggroSound() end)
-          RowLabel(p, "Alert when", R_X, top - 28)
-          local lvl = Cycle(p, 174, TM.AGGRO_LEVEL_KEYS, TM.AGGRO_LEVEL_LABELS,
-              function() return TM.db.aggroSoundLevel end,
-              function(v) TM.db.aggroSoundLevel = v end)
-          lvl:SetPoint("TOPLEFT", cx, top - 26)
-          AddRefresher(lvl.Refresh)
-          RowLabel(p, "Sound channel", R_X, top - 56)
-          local ch = Cycle(p, 120, TM.SOUND_CHANNEL_KEYS, TM.SOUND_CHANNEL_LABELS,
-              function() return TM.db.aggroSoundChannel end,
-              function(v) TM.db.aggroSoundChannel = v; TM:TestAggroSound() end)
-          ch:SetPoint("TOPLEFT", cx, top - 54)
-          AddRefresher(ch.Refresh)
-          return -(top - 56) + 34
-      end },
+local function BuildAppearanceTab(p)
+    local names = Card(p, "Bars & names", 0, 0, PAGE_W, 120)
+    Switch(names, "Class colors for names", 12, -30, "classColors")
+    Switch(names, "Role icons", 12, -56, "roleIcons")
+    Switch(names, "Health % instead of aggro words", 12, -82, "healthText")
+    RowLabel(names, "Bar texture", 284, -28)
+    local tex = Dropdown(names, 140, TM.TEXTURE_KEYS, TM.TEXTURE_LABELS,
+        function() return TM.db.barTexture end,
+        function(v) TM.db.barTexture = v; TM:ApplyFonts() end)
+    tex:SetPoint("TOPLEFT", 380, -28)
+    AddRefresher(tex.Refresh)
 
-    { key = "reach", title = "Reach",
-      build = function(p, top)
-          Check(p, "Fade bars your taunt can't reach", L_X, top, "rangeFade", SMALL)
-          Note(p, "Red X beside a bar = that player has no enemy targeted, so clicking it won't taunt anything.", L_X + 28, top - 24)
-          return -top + 44
-      end },
+    local text = Card(p, "Text size", 0, -130, PAGE_W, 80)
+    FlatSlider(text, "Header", 12, -30, 244, "headerFontSize", 8, 20, nil, function() TM:ApplyFonts() end)
+    FlatSlider(text, "Members", 284, -30, 244, "nameFontSize", 8, 20, nil, function() TM:ApplyFonts() end)
+end
 
-    { key = "cooldowns", title = "Taunt Cooldowns",
-      build = function(p, top)
-          -- Mutually exclusive: checking one unchecks the other (unchecking both hides the icons)
-          local onCd = Check(p, "Show on cooldown", L_X, top, "cdShowOnCooldown", SMALL)
-          local ready = Check(p, "Show when ready", L_X, top - 24, "cdShowWhenReady", SMALL)
-          local function exclusive(cb, key, other, otherKey)
-              cb:SetScript("OnClick", function(self)
-                  TM.db[key] = self:GetChecked() and true or false
-                  if TM.db[key] then
-                      TM.db[otherKey] = false
-                      other:SetChecked(false)
-                  end
-                  TM:UpdateCooldowns()
-              end)
-          end
-          exclusive(onCd, "cdShowOnCooldown", ready, "cdShowWhenReady")
-          exclusive(ready, "cdShowWhenReady", onCd, "cdShowOnCooldown")
-          Slider(p, "Icon Size", top, "cdIconSize", 16, 64, nil, nil, R_MID)
-          return -top + 56
-      end },
+local function BuildAlertsTab(p)
+    local aggro = Card(p, "Aggro", 0, 0, 330, 170)
+    Switch(aggro, "Flash bar while they have aggro", 12, -30, "flashAggro")
+    Switch(aggro, "Play a sound", 12, -56, "aggroSound")
+    RowLabel(aggro, "Sound", 12, -84)
+    local snd = Dropdown(aggro, 130, TM.AGGRO_SOUND_KEYS, TM.AGGRO_SOUND_LABELS,
+        function() return TM.db.aggroSoundKey end,
+        function(v) TM.db.aggroSoundKey = v; TM:TestAggroSound() end)
+    snd:SetPoint("TOPLEFT", 120, -82)
+    AddRefresher(snd.Refresh)
+    local test = FlatButton(aggro, "Test", 52)
+    test:SetPoint("LEFT", snd, "RIGHT", 6, 0)
+    test:SetScript("OnClick", function() TM:TestAggroSound() end)
+    RowLabel(aggro, "Alert when", 12, -112)
+    local lvl = Dropdown(aggro, 188, TM.AGGRO_LEVEL_KEYS, TM.AGGRO_LEVEL_LABELS,
+        function() return TM.db.aggroSoundLevel end,
+        function(v) TM.db.aggroSoundLevel = v end)
+    lvl:SetPoint("TOPLEFT", 120, -110)
+    AddRefresher(lvl.Refresh)
+    RowLabel(aggro, "Sound channel", 12, -140)
+    local ch = Dropdown(aggro, 130, TM.SOUND_CHANNEL_KEYS, TM.SOUND_CHANNEL_LABELS,
+        function() return TM.db.aggroSoundChannel end,
+        function(v) TM.db.aggroSoundChannel = v; TM:TestAggroSound() end)
+    ch:SetPoint("TOPLEFT", 120, -138)
+    AddRefresher(ch.Refresh)
 
-    { key = "mana", title = "Low Mana Warning",
-      sub = "Shows beside your bar and your healers' bars.",
-      build = function(p, top)
-          Check(p, "Show low mana warning", L_X, top, "hideManaWarning", SMALL, true)
-          Slider(p, "Warn at", top, "manaWarnPct", 5, 50, "%", function() TM:UpdateManaWarning() end, R_MID)
-          return -top + 56
-      end },
+    local reach = Card(p, "Reach", 340, 0, 200, 90)
+    Switch(reach, "Fade bars your taunt can't reach", 12, -30, "rangeFade", false, 140)
+    MutedNote(reach, "Red X = no enemy targeted", 12, -68)
 
-    { key = "announce", title = "Announcements",
-      build = function(p, top)
-          RowLabel(p, "Channel", L_X, top)
-          local chan = Cycle(p, 120, TM.ANNOUNCE_CHANNELS, TM.ANNOUNCE_LABELS,
-              function() return TM.db.announceChannel end,
-              function(v) TM.db.announceChannel = v end)
-          chan:SetPoint("TOPLEFT", L_X + 90, top + 2)
-          AddRefresher(chan.Refresh)
-          RowLabel(p, "Message", L_X, top - 30)
-          local msg = EditBox(p, 420)
-          msg:SetPoint("TOPLEFT", L_X + 96, top - 28)
-          msg:SetScript("OnEditFocusLost", function(self) TM.db.announceText = self:GetText() end)
-          AddRefresher(function() msg:SetText(TM.db.announceText or "") end)
-          Note(p, "{target} = the mob, {player} = the player you saved. Sent only when a taunt you clicked\n" ..
-              "actually casts. Say and Yell only work inside instances.", L_X, top - 56)
-          return -top + 80
-      end },
+    local mana = Card(p, "Low mana", 340, -100, 200, 70 + 20)
+    Switch(mana, "Show warning", 12, -30, "hideManaWarning", true, 140,
+        function() TM:UpdateManaWarning() end)
+    FlatSlider(mana, "Warn at", 12, -52, 176, "manaWarnPct", 5, 50, "%", function() TM:UpdateManaWarning() end)
 
-    { key = "tot", title = "Target's Target",
-      build = function(p, top)
-          Check(p, "Show your target's target bar", L_X, top, "showToT", SMALL)
-          Note(p, "Shows who your target is hitting. Click it to taunt your own target.", L_X + 28, top - 24)
-          return -top + 44
-      end },
+    local cd = Card(p, "Taunt cooldown icons", 0, -200, PAGE_W, 84)
+    -- Mutually exclusive: turning one on turns the other off (both off hides the icons)
+    local onCd, ready
+    onCd = Switch(cd, "Show on cooldown", 12, -30, "cdShowOnCooldown", false, nil, function(v)
+        if v then TM.db.cdShowWhenReady = false; ready.paint() end
+        TM:UpdateCooldowns()
+    end)
+    ready = Switch(cd, "Show when ready", 12, -56, "cdShowWhenReady", false, nil, function(v)
+        if v then TM.db.cdShowOnCooldown = false; onCd.paint() end
+        TM:UpdateCooldowns()
+    end)
+    FlatSlider(cd, "Icon size", 284, -30, 244, "cdIconSize", 16, 64)
+end
 
-    { key = "keys", title = "Controller & Keybindings",
-      build = function(p, top)
-          Check(p, "Show keybinding hints beside party bars", L_X, top, "keyHints", SMALL)
-          Note(p, "Set keys or controller buttons in Options > Keybindings > TauntMaster Forever.", L_X + 28, top - 24)
-          return -top + 44
-      end },
+local function BuildGeneralTab(p)
+    local keys = Card(p, "Controller & keybindings", 0, 0, PAGE_W, 76)
+    Switch(keys, "Show keybinding hints beside party bars", 12, -30, "keyHints")
+    MutedNote(keys, "Set keys or controller buttons in Options > Keybindings > TauntMaster Forever.", 50, -52)
 
-    { key = "bindings", title = "Click Bindings",
-      sub = "Every mouse button and modifier. Spell names autocomplete and are checked as you type.",
-      build = function(p, top)
-          BuildBindingsSection(p, top)
-          -- 12 rows of 25, then the buttons and message line
-          return -top + 18 + 12 * 25 + 60
-      end },
+    local other = Card(p, "Other", 0, -86, PAGE_W, 84)
+    Switch(other, "Show minimap icon", 12, -30, "minimap")
+    Switch(other, "Show welcome screen after updates", 12, -56, "showSplash", false, nil, function() end)
 
-    { key = "general", title = "General",
-      build = function(p, top)
-          Check(p, "Show minimap icon", L_X, top, "minimap", SMALL)
-          Check(p, "Show welcome screen after updates", L_X, top - 24, "showSplash", SMALL)
-          return -top + 44
-      end },
+    local cmds = Card(p, "Commands", 0, -180, PAGE_W, 116)
+    local lines = {
+        "|cff8fd3ff/tm|r  open or close these options",
+        "|cff8fd3ff/tm toggle|r  show or hide the bars",
+        "|cff8fd3ff/tm lock|r / |cff8fd3ff/tm unlock|r  lock or unlock the bars",
+        "|cff8fd3ff/tm check|r  check your bound spells",
+        "|cff8fd3ff/tm news|r  what's new      |cff8fd3ff/tm reset|r  move the bars back to the center",
+    }
+    for i, l in ipairs(lines) do
+        local fs = Text(cmds, l, "GameFontHighlightSmall")
+        fs:SetPoint("TOPLEFT", 12, -26 - (i - 1) * 17)
+    end
+end
+
+local TABS = {
+    { key = "taunts",     label = "Taunts",         icon = "Interface\\Icons\\Ability_Physical_Taunt",     build = BuildTauntsTab },
+    { key = "bindings",   label = "Click Bindings", icon = "Interface\\Icons\\INV_Misc_Note_01",           build = BuildBindingsTab },
+    { key = "layout",     label = "Layout",         icon = "Interface\\Icons\\INV_Misc_Spyglass_03",       build = BuildLayoutTab },
+    { key = "appearance", label = "Appearance",     icon = "Interface\\Icons\\INV_Fabric_Silk_02",         build = BuildAppearanceTab },
+    { key = "alerts",     label = "Alerts",         icon = "Interface\\Icons\\Ability_Warrior_BattleShout", build = BuildAlertsTab },
+    { key = "general",    label = "General",        icon = "Interface\\Icons\\INV_Misc_Gear_01",           build = BuildGeneralTab },
 }
 
-local sectionOffsets = {}
+local pages, tabButtons = {}, {}
+local currentTab
+
+local function ShowTab(key)
+    currentTab = key
+    for k, page in pairs(pages) do page:SetShown(k == key) end
+    for k, b in pairs(tabButtons) do
+        local sel = (k == key)
+        b.selBg:SetShown(sel)
+        b.accent:SetShown(sel)
+        b.icon:SetDesaturated(not sel)
+        b.icon:SetAlpha(sel and 1 or 0.7)
+        local c = sel and C.gold or C.muted
+        b.label:SetTextColor(c[1], c[2], c[3])
+    end
+    HideSuggest()
+end
 
 local function BuildWindow()
-    win = Window("TauntMasterForeverConfig", "TauntMaster Forever Options", 600, 560)
+    local W, H, HEADER, FOOTER, SIDE = 740, 540, 52, 40, 170
+    win = CreateFrame("Frame", "TauntMasterForeverConfig", UIParent)
+    win:SetSize(W, H)
+    win:SetPoint("CENTER")
+    win:SetFrameStrata("DIALOG")
+    win:SetToplevel(true)
+    win:SetMovable(true)
+    win:SetClampedToScreen(true)
+    win:EnableMouse(true)
+    win:SetScript("OnShow", RunRefreshers)
+    win:SetScript("OnHide", HideSuggest)
+    win:Hide()
+    table.insert(UISpecialFrames, "TauntMasterForeverConfig")
+    Fill(win, C.win)
+    Border(win, C.edge)
 
-    local scroll = CreateFrame("ScrollFrame", "TauntMasterForeverConfigScroll", win, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 6, -28)
-    scroll:SetPoint("BOTTOMRIGHT", -30, 42)
-    local content = CreateFrame("Frame", nil, scroll)
-    content:SetSize(560, 10)
-    scroll:SetScrollChild(content)
-    win.scroll = scroll
+    -- Header: drag to move
+    local header = CreateFrame("Frame", nil, win)
+    header:SetPoint("TOPLEFT", 1, -1)
+    header:SetPoint("TOPRIGHT", -1, -1)
+    header:SetHeight(HEADER)
+    header:EnableMouse(true)
+    header:RegisterForDrag("LeftButton")
+    header:SetScript("OnDragStart", function() win:StartMoving() end)
+    header:SetScript("OnDragStop", function() win:StopMovingOrSizing() end)
+    local hbg = header:CreateTexture(nil, "BACKGROUND")
+    hbg:SetAllPoints()
+    hbg:SetColorTexture(1, 1, 1, 1)
+    local ok = CreateColor and pcall(hbg.SetGradient, hbg, "HORIZONTAL",
+        CreateColor(0.35, 0.075, 0.047, 1), CreateColor(0.11, 0.03, 0.024, 1))
+    if not ok then hbg:SetColorTexture(0.25, 0.06, 0.04, 1) end
+    local hline = header:CreateTexture(nil, "BORDER")
+    hline:SetPoint("BOTTOMLEFT"); hline:SetPoint("BOTTOMRIGHT"); hline:SetHeight(1)
+    hline:SetColorTexture(unpack(C.edge))
+    local logo = header:CreateTexture(nil, "ARTWORK")
+    logo:SetSize(36, 36)
+    logo:SetPoint("LEFT", 14, 0)
+    logo:SetTexture("Interface\\AddOns\\TauntMasterForever\\Media\\logo")
+    local title = Text(header, "TauntMaster Forever", "GameFontNormalLarge", { 0.95, 0.9, 0.78 }, 18)
+    title:SetPoint("LEFT", logo, "RIGHT", 10, 0)
+    local ver = Text(header, "", "GameFontNormalSmall", { 0.85, 0.65, 0.35 })
+    ver:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 8, 1)
+    AddRefresher(function()
+        local v = TM.CurrentNewsVersion and TM:CurrentNewsVersion()
+        ver:SetText(v and ("v" .. v) or "")
+    end)
+    local x = FlatButton(header, "X", 24, 24)
+    x:SetPoint("RIGHT", -12, 0)
+    x:SetScript("OnClick", function() win:Hide() end)
 
-    local y = 0
-    for _, sec in ipairs(SECTIONS) do
-        local f = CreateFrame("Frame", nil, content)
-        f:SetPoint("TOPLEFT", 0, -y)
-        f:SetWidth(560)
-        Label(f, sec.title, 12, -10, "GameFontNormalLarge")
-        local top = -36
-        if sec.sub then
-            Note(f, sec.sub, 12, -30)
-            top = -50
-        end
-        local h = sec.build(f, top) + 16
-        f:SetHeight(h)
-        local line = f:CreateTexture(nil, "ARTWORK")
-        line:SetPoint("BOTTOMLEFT", 10, 2)
-        line:SetPoint("BOTTOMRIGHT", -6, 2)
-        line:SetHeight(1)
-        line:SetColorTexture(0.29, 0.25, 0.16, 0.8)
-        sectionOffsets[sec.key] = y
-        y = y + h
+    -- Sidebar tabs
+    local side = CreateFrame("Frame", nil, win)
+    side:SetPoint("TOPLEFT", 1, -(HEADER + 1))
+    side:SetPoint("BOTTOMLEFT", 1, FOOTER + 1)
+    side:SetWidth(SIDE)
+    Fill(side, C.side)
+    local sline = side:CreateTexture(nil, "BORDER")
+    sline:SetPoint("TOPRIGHT"); sline:SetPoint("BOTTOMRIGHT"); sline:SetWidth(1)
+    sline:SetColorTexture(unpack(C.line))
+    for i, t in ipairs(TABS) do
+        local b = CreateFrame("Button", nil, side)
+        b:SetSize(SIDE - 1, 36)
+        b:SetPoint("TOPLEFT", 0, -8 - (i - 1) * 36)
+        b.selBg = b:CreateTexture(nil, "BACKGROUND")
+        b.selBg:SetAllPoints()
+        b.selBg:SetColorTexture(0.23, 0.06, 0.04, 1)
+        b.accent = b:CreateTexture(nil, "ARTWORK")
+        b.accent:SetPoint("TOPLEFT"); b.accent:SetPoint("BOTTOMLEFT"); b.accent:SetWidth(3)
+        b.accent:SetColorTexture(0.89, 0.23, 0.13, 1)
+        local hl = b:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints()
+        hl:SetColorTexture(1, 1, 1, 0.05)
+        b.icon = b:CreateTexture(nil, "ARTWORK")
+        b.icon:SetSize(18, 18)
+        b.icon:SetPoint("LEFT", 16, 0)
+        b.icon:SetTexture(t.icon)
+        b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        local fs = Text(b, "", "GameFontHighlight")
+        fs:SetPoint("LEFT", b.icon, "RIGHT", 10, 0)
+        b:SetFontString(fs)
+        b.label = fs
+        b:SetText(t.label)
+        b:SetScript("OnClick", function() ShowTab(t.key) end)
+        tabButtons[t.key] = b
     end
-    content:SetHeight(y + 10)
 
-    local close = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
-    close:SetSize(100, 22)
-    close:SetPoint("BOTTOMRIGHT", -14, 12)
-    close:SetText("Close")
+    -- Pages
+    for _, t in ipairs(TABS) do
+        local page = CreateFrame("Frame", nil, win)
+        page:SetPoint("TOPLEFT", SIDE + 16, -(HEADER + 14))
+        page:SetPoint("BOTTOMRIGHT", -16, FOOTER + 10)
+        local pt = Text(page, t.label, "GameFontNormalLarge", C.gold, 17)
+        pt:SetPoint("TOPLEFT", 0, 0)
+        local body = CreateFrame("Frame", nil, page)
+        body:SetPoint("TOPLEFT", 0, -30)
+        body:SetPoint("BOTTOMRIGHT")
+        t.build(body)
+        pages[t.key] = page
+    end
+
+    -- Footer
+    local foot = CreateFrame("Frame", nil, win)
+    foot:SetPoint("BOTTOMLEFT", 1, 1)
+    foot:SetPoint("BOTTOMRIGHT", -1, 1)
+    foot:SetHeight(FOOTER)
+    Fill(foot, C.side)
+    local fline = foot:CreateTexture(nil, "BORDER")
+    fline:SetPoint("TOPLEFT"); fline:SetPoint("TOPRIGHT"); fline:SetHeight(1)
+    fline:SetColorTexture(unpack(C.line))
+    local hint = Text(foot, "/tm to open  -  /tm news for what's new", "GameFontDisableSmall")
+    hint:SetPoint("LEFT", 14, 0)
+    local close = FlatButton(foot, "Close", 90)
+    close:SetPoint("RIGHT", -14, 0)
     close:SetScript("OnClick", function() win:Hide() end)
+
+    ShowTab("taunts")
 end
 
 ---------------------------------------------------------------------------
 -- Entry point: /tm, minimap, header menu
---   nil toggles the window; a name scrolls to that section
---   (older names like "display", "advanced", "extras" still work)
+--   nil toggles the window; a name opens that tab (older names still work)
 ---------------------------------------------------------------------------
-local SECTION_ALIASES = { display = "spells", general = "spells", advanced = "appearance",
-    spells = "bindings", bindings = "bindings", extras = "aggro" }
+local TAB_ALIASES = { display = "taunts", spells = "bindings", advanced = "appearance", extras = "alerts" }
 
 function TM:OpenConfig(page)
     if not win then BuildWindow() end
@@ -939,10 +1115,10 @@ function TM:OpenConfig(page)
     end
     win:Show()
     win:Raise()
-    local key = SECTION_ALIASES[page] or page
-    win.scroll:SetVerticalScroll(sectionOffsets[key] or 0)
+    local key = TAB_ALIASES[page] or page
+    if pages[key] then ShowTab(key) end
 end
 
 TM._spellRows = spellRows
 TM._suggest = function() return suggest end
-TM._sectionOffsets = sectionOffsets
+TM._tabs = { show = ShowTab, current = function() return currentTab end, pages = pages, buttons = tabButtons }

@@ -1,6 +1,8 @@
-## 1.11.1
+## 1.12.0
 
+- Redesigned options window: a custom look with tabs down the left side (Taunts, Click Bindings, Layout, Appearance, Alerts, General), grouped cards, on/off switches, dropdown menus and cleaner sliders.
 - Renamed the aggro "Volume slider" option to "Sound channel". It picks which of WoW's volume settings (Master, Sound Effects or Dialog) the alert follows.
+- The General tab lists the slash commands.
 
 ## 1.11.0
 

@@ -115,7 +115,8 @@ function Methods:SetMinMaxValues(a, b) end
 function Methods:RegisterEvent(e) self.__events = self.__events or {} self.__events[e] = true end
 function Methods:RegisterUnitEvent(e) self.__events = self.__events or {} self.__events[e] = true end
 function Methods:SetAlpha(a) self.__alpha = a end
-function Methods:GetFontString() return nil end
+function Methods:SetFontString(fs) self.__fs = fs end
+function Methods:GetFontString() return self.__fs end
 function Methods:SetEnabled(v) self.__enabled = v end
 
 function CreateFrame(kind, name, parent, template) return newObj(kind, name, parent, template) end

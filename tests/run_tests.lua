@@ -177,20 +177,23 @@ SECRET_MODE = true
 runScenario("hidden values")
 SECRET_MODE = false
 
-step("options window: every tab, check, slider, cycle, button")
+step("options window: every tab, switch, slider, dropdown, button")
 TM:OpenConfig()
 local win = TauntMasterForeverConfig
 assert(win and win.__shown, "window open")
-for _, page in ipairs({ "general", "advanced", "spells", "extras", "display", "bindings" }) do TM:OpenConfig(page) end
+for _, page in ipairs({ "general", "advanced", "spells", "extras", "display", "bindings", "layout", "alerts", "taunts", "appearance" }) do TM:OpenConfig(page) end
 local function walk(f, fn) fn(f) for _, c in ipairs(f.__children or {}) do walk(c, fn) end end
 local clicked, slid = 0, 0
 walk(win, function(f)
-    if f.__kind == "CheckButton" and f.__scripts.OnClick then
+    if f.isSwitch then
+        -- flip and flip back, so settings end where they started
+        f.__scripts.OnClick(f); f.__scripts.OnClick(f); clicked = clicked + 1
+    elseif f.__kind == "CheckButton" and f.__scripts.OnClick then
         f:SetChecked(not f:GetChecked()); f.__scripts.OnClick(f); clicked = clicked + 1
         f:SetChecked(not f:GetChecked()); f.__scripts.OnClick(f)
     elseif f.__kind == "Slider" and f.__scripts.OnValueChanged then
         f.__scripts.OnValueChanged(f, 17); f.__scripts.OnValueChanged(f, 12); slid = slid + 1
-    elseif f.__kind == "Button" and f.__scripts.OnClick and f.__text ~= "Close" then
+    elseif f.__kind == "Button" and f.__scripts.OnClick and f.__text ~= "Close" and f.__text ~= "X" then
         f.__scripts.OnClick(f, "LeftButton"); clicked = clicked + 1
     elseif f.__kind == "EditBox" and f.__scripts.OnEditFocusLost then
         f.__scripts.OnEditFocusLost(f)
@@ -509,45 +512,78 @@ local cf = assert(io.open(ADDON_DIR .. "/CHANGELOG.md")); local topVersion = cf:
 assertEq(TM:CurrentNewsVersion(), topVersion, "News.lua top version matches CHANGELOG.md")
 for _, e in ipairs(TM.NEWS) do assert(e.version and e.date and #e.items > 0, "news entry complete") end
 
-step("single-page settings")
+step("tabbed settings")
 TM:OpenConfig(); TM:OpenConfig()          -- close then reopen
 local cfg = TauntMasterForeverConfig
 assert(cfg.__shown, "options open")
--- Sections in order, each below the last
-local order = { "spells", "layout", "appearance", "aggro", "reach", "cooldowns", "mana",
-    "announce", "tot", "keys", "bindings", "general" }
-local prev = -1
-for _, k in ipairs(order) do
-    local off = TM._sectionOffsets[k]
-    assert(off and off > prev, "section in order: " .. k)
-    prev = off
+local tabs = TM._tabs
+for _, k in ipairs({ "taunts", "bindings", "layout", "appearance", "alerts", "general" }) do
+    assert(tabs.pages[k] and tabs.buttons[k], "tab exists: " .. k)
+    tabs.buttons[k].__scripts.OnClick(tabs.buttons[k])
+    assertEq(tabs.current(), k, "clicking tab shows it: " .. k)
+    for other, page in pairs(tabs.pages) do assertEq(page.__shown, other == k, "only one page visible") end
+    assertEq(tabs.buttons[k].selBg.__shown, true, "selected tab highlighted")
 end
--- Old tab names and /tm spells scroll to the right section
-TM:OpenConfig("spells"); assertEq(cfg.scroll.__scroll, TM._sectionOffsets.bindings, "/tm spells -> Click Bindings")
-TM:OpenConfig("extras"); assertEq(cfg.scroll.__scroll, TM._sectionOffsets.aggro, "extras -> Aggro Alerts")
-TM:OpenConfig("display"); assertEq(cfg.scroll.__scroll, 0, "display -> top")
--- No tab buttons left
+-- Old names still open the right tab
+TM:OpenConfig("spells"); assertEq(tabs.current(), "bindings", "/tm spells -> Click Bindings")
+TM:OpenConfig("extras"); assertEq(tabs.current(), "alerts", "extras -> Alerts")
+TM:OpenConfig("advanced"); assertEq(tabs.current(), "appearance", "advanced -> Appearance")
+TM:OpenConfig("display"); assertEq(tabs.current(), "taunts", "display -> Taunts")
 local function walk(f, fn) fn(f) for _, c in ipairs(f.__children or {}) do walk(c, fn) end end
-walk(cfg, function(f)
-    if f.__kind == "Button" then
-        for _, t in ipairs({ "General", "Advanced", "Extras" }) do assert(f.__text ~= t, "leftover tab: " .. t) end
+-- Switches save and repaint; inverted ones show the opposite of the saved value
+local soloSwitch
+walk(cfg, function(f) if f.isSwitch and not soloSwitch then
+    local before = TM.db.showSolo
+    f.__scripts.OnClick(f)
+    if TM.db.showSolo ~= before then soloSwitch = f else f.__scripts.OnClick(f) end
+end end)
+assert(soloSwitch, "Hide when solo switch found")
+soloSwitch.__scripts.OnClick(soloSwitch)
+-- Cooldown switches stay exclusive
+TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady = true, false
+local cdSwitches = {}
+walk(cfg, function(f) if f.isSwitch then cdSwitches[#cdSwitches + 1] = f end end)
+for _, f in ipairs(cdSwitches) do
+    local a, b = TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady
+    f.__scripts.OnClick(f)
+    if TM.db.cdShowWhenReady and not b then
+        assertEq(TM.db.cdShowOnCooldown, false, "turning on 'when ready' turns off 'on cooldown'")
+        f.__scripts.OnClick(f)                 -- off again
+        TM.db.cdShowOnCooldown = true
+    elseif (TM.db.cdShowOnCooldown ~= a) or (TM.db.cdShowWhenReady ~= b) then
+        f.__scripts.OnClick(f)                 -- not a cooldown switch here; put it back
+    else
+        f.__scripts.OnClick(f)
     end
-end)
+end
+-- Dropdowns open a menu; picking an item saves it
+MENUS = {}
+local chanDropdown
+walk(cfg, function(f) if f.__kind == "Button" and f.Choose and f.__text == "Master" then chanDropdown = f end end)
+assert(chanDropdown, "sound channel dropdown found")
+chanDropdown.__scripts.OnClick(chanDropdown)
+local menu = MENUS[#MENUS]
+assertEq(#menu.entries, 3, "three sound channels offered")
+menu.entries[2].fn()
+assertEq(TM.db.aggroSoundChannel, "SFX", "picking from the menu saves it")
+assertEq(chanDropdown.__text, "Sound Effects", "dropdown shows the choice")
+TM.db.aggroSoundChannel = "Master"
+-- Labels: "Sound channel", not "Volume slider"
+local labels = {}
+walk(cfg, function(f) if f.__kind == "FontString" and f.__text then labels[f.__text] = true end end)
+assert(labels["Sound channel"] and not labels["Volume slider"], "sound channel label")
+assert(labels["Show welcome screen after updates"], "welcome screen switch present")
 -- Scale slider moves in 0.05 steps
-local scaleSlider
+local scaleOk = false
 walk(cfg, function(f) if f.__kind == "Slider" then
     f.__scripts.OnValueChanged(f, 1.23)
-    if TM.db.scale and math.abs(TM.db.scale - 1.25) < 0.001 then scaleSlider = f end
+    if TM.db.scale and math.abs(TM.db.scale - 1.25) < 0.001 then scaleOk = true end
 end end)
-assert(scaleSlider, "scale slider rounds to 0.05")
+assert(scaleOk, "scale slider rounds to 0.05")
 TM.db.scale = 1; TM.db.width = 120; TM.db.height = 24; TM.db.unitsPerColumn = 5; TM.db.maxColumns = 8
 TM.db.spacing = 2; TM.db.headerFontSize = 10; TM.db.nameFontSize = 10; TM.db.cdIconSize = 26; TM.db.manaWarnPct = 20
 TM:ApplySettings()
 for _, b in ipairs(TM.partyButtons) do b:Show() end   -- the game's unit watcher re-shows these
--- Show welcome screen checkbox is in General
-local found = false
-walk(cfg, function(f) if f.__kind == "FontString" and f.__text == "Show welcome screen after updates" then found = true end end)
-assert(found, "welcome screen checkbox present")
 
 step("aggro sound options")
 local function soundsSince(n) local out = {} for i = n + 1, #LOG do if LOG[i]:find("^SOUND") then out[#out + 1] = LOG[i] end end return out end

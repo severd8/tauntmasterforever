@@ -60,22 +60,16 @@ Taunts cast on "their target" go to the enemy the clicked player is fighting. Bl
 
 ### Options window
 
-All settings are on one scrolling page, in sections:
+Settings are grouped into tabs down the left side of the options window:
 
-| Section | What's there |
+| Tab | What's there |
 |---|---|
-| **Taunt Spells** | Left and Right Click spell pickers |
-| **Layout** | Bar size, units per column, max columns, spacing, scale, lock, include yourself, show in raids, hide when solo, tank-stance-only mode, sort by role, reset position |
-| **Appearance** | Class colors, role icons, health %, bar texture, text sizes |
-| **Aggro Alerts** | Flash bar, aggro sound, sound choice with a Test button, when it plays, sound channel |
-| **Reach** | Fade bars your taunt can't reach (red X = no enemy targeted) |
-| **Taunt Cooldowns** | Show on cooldown or when ready, icon size |
-| **Low Mana Warning** | On/off and the percentage it warns at |
-| **Announcements** | Chat channel and message |
-| **Target's Target** | Show the target's target bar |
-| **Controller & Keybindings** | Keybinding hints beside party bars |
+| **Taunts** | Left and Right Click spell pickers, taunt announcements, target's target bar |
 | **Click Bindings** | Every mouse button and modifier, with spell names or macros |
-| **General** | Minimap icon, welcome screen after updates |
+| **Layout** | Bar size, columns, spacing, scale, lock, include yourself, show in raids, hide when solo, tank-stance-only mode, sort by role, reset position |
+| **Appearance** | Class colors, role icons, health %, bar texture, text sizes |
+| **Alerts** | Aggro flash and sound (sound choice with a Test button, when it plays, sound channel), reach fading, low mana warning, taunt cooldown icons |
+| **General** | Keybinding hints, minimap icon, welcome screen, command list |
 
 In a custom macro, `{unit}` is replaced with the clicked player (for example `/cast [@{unit}target] Growl`).
 
@@ -89,7 +83,7 @@ Prefer a controller, or keys instead of clicking? Go to **Options → Keybinding
 | **You / Party 1–4: Right Click spell** | Casts your Right Click spell for that player |
 | **Targeted ally: Left / Right Click spell** | Target a friendly player, then press it to taunt whatever is attacking them. Works in raids too. |
 
-Bound keys appear beside each party bar, so you always know which button saves whom. Turn the hints off in the **Controller & Keybindings** section of the options.
+Bound keys appear beside each party bar, so you always know which button saves whom. Turn the hints off on the **General** tab of the options.
 
 ### Slash commands
 
@@ -117,7 +111,7 @@ WoW: Forever runs on the modern addon system, which hides some combat informatio
 
 ## Troubleshooting
 
-- **A click does nothing** — type `/tm check`. It lists each bound spell and whether it was found and learned. Fix any misspelled spell in the **Click Bindings** section.
+- **A click does nothing** — type `/tm check`. It lists each bound spell and whether it was found and learned. Fix any misspelled spell on the **Click Bindings** tab.
 - **The bars disappeared** — you may have hidden them, or turned on **Hide When Solo** or tank-stance-only mode. Type `/tm show`.
 - **The bars are off-screen** — type `/tm reset`.
 

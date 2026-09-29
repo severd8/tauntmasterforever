@@ -361,7 +361,11 @@ for name in xml:gmatch('name="([^"]+)"') do
     assert(_G["BINDING_NAME_" .. name], "missing binding name for " .. name)
 end
 assertEq(count, 12, "12 keybindings")
-assertEq(BINDING_HEADER_TAUNTMASTERFOREVER, "TauntMaster Forever", "binding header")
+-- Own section in the Keybindings menu, like other addons
+local cats = {}
+for c in xml:gmatch('category="([^"]+)"') do cats[#cats + 1] = c end
+assertEq(#cats, 12, "every binding has a category")
+for _, c in ipairs(cats) do assertEq(c, "TauntMaster Forever", "category is the addon's own section") end
 -- Keybinding presses use the plain Left/Right Click spell, whatever modifier is held
 TM:GetBindings()["shift-1"] = { kind = "enemy", text = "Taunt" }
 TM:ApplyBindings()

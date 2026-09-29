@@ -813,7 +813,7 @@ local function BuildExtrasPage(page)
     Label(page, "Controller & keybindings", 16, -374, "GameFontNormalLarge")
     Check(page, "Show keybinding hints beside party bars", 16, -396, "keyHints")
     local keyNote = Label(page,
-        "Set keys or controller buttons in Options > Keybindings > AddOns > TauntMaster Forever.",
+        "Set keys or controller buttons in Options > Keybindings > TauntMaster Forever.",
         44, -418, "GameFontDisableSmall")
     keyNote:SetJustifyH("LEFT")
 end

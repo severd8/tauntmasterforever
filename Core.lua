@@ -863,11 +863,10 @@ function TM:ApplyBindingsToButton(btn, bindings)
 end
 
 ---------------------------------------------------------------------------
--- Keybindings (Options > Keybindings > AddOns > TauntMaster Forever).
+-- Keybindings (Options > Keybindings > TauntMaster Forever).
 -- Listed in Bindings.xml; each one presses a bar (or the hidden "targeted ally"
 -- button) with the Left or Right Click spell.
 ---------------------------------------------------------------------------
-BINDING_HEADER_TAUNTMASTERFOREVER = "TauntMaster Forever"
 TM.KEYBIND_UNITS = {
     { unit = "player", label = "You" },
     { unit = "party1", label = "Party 1" },

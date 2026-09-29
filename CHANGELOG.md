@@ -1,3 +1,7 @@
+## 1.9.1
+
+- Keybindings now have their own "TauntMaster Forever" section in Options > Keybindings, like other addons, instead of being listed under AddOns.
+
 ## 1.9.0
 
 - New: a red X beside a bar means that player has no enemy targeted, so clicking their bar has nothing to taunt. Their bar also fades.
@@ -7,7 +11,7 @@
 
 ## 1.8.0
 
-- New: controller and keyboard support. Under Options > Keybindings > AddOns > TauntMaster Forever you can bind a key or controller button to taunt off yourself or any party member, using your Left or Right Click spell.
+- New: controller and keyboard support. Under Options > Keybindings > TauntMaster Forever you can bind a key or controller button to taunt off yourself or any party member, using your Left or Right Click spell.
 - New: "Targeted ally" keybindings. Target a friendly player and press it to taunt whatever is attacking them. Works in raids too.
 - New: keybinding hints beside each party bar show which button taunts off that player (can be turned off on the Extras tab).
 - Keybindings always use the plain Left/Right Click spell, even if your controller button includes a modifier like Shift.

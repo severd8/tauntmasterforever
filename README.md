@@ -71,7 +71,7 @@ In a custom macro, `{unit}` is replaced with the clicked player (for example `/c
 
 ### Controller and keybindings
 
-Prefer a controller, or keys instead of clicking? Go to **Options → Keybindings → AddOns → TauntMaster Forever** and bind any key or controller button:
+Prefer a controller, or keys instead of clicking? Go to **Options → Keybindings → TauntMaster Forever** and bind any key or controller button:
 
 | Binding | Does |
 |---|---|

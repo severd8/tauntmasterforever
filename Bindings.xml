@@ -1,16 +1,17 @@
 <!-- Keybindings for TauntMaster Forever. WoW loads this file automatically.
+     category gives the addon its own section in Options > Keybindings (like Details!, HealBot, etc.).
      Each binding presses a bar with the Left or Right Click spell; names are set in Core.lua. -->
 <Bindings>
-  <Binding name="CLICK TauntMasterForever_player:TMLeft" header="TAUNTMASTERFOREVER" category="ADDONS"/>
-  <Binding name="CLICK TauntMasterForever_player:TMRight" category="ADDONS"/>
-  <Binding name="CLICK TauntMasterForever_party1:TMLeft" category="ADDONS"/>
-  <Binding name="CLICK TauntMasterForever_party1:TMRight" category="ADDONS"/>
-  <Binding name="CLICK TauntMasterForever_party2:TMLeft" category="ADDONS"/>
-  <Binding name="CLICK TauntMasterForever_party2:TMRight" category="ADDONS"/>
-  <Binding name="CLICK TauntMasterForever_party3:TMLeft" category="ADDONS"/>
-  <Binding name="CLICK TauntMasterForever_party3:TMRight" category="ADDONS"/>
-  <Binding name="CLICK TauntMasterForever_party4:TMLeft" category="ADDONS"/>
-  <Binding name="CLICK TauntMasterForever_party4:TMRight" category="ADDONS"/>
-  <Binding name="CLICK TauntMasterForever_ally:TMLeft" category="ADDONS"/>
-  <Binding name="CLICK TauntMasterForever_ally:TMRight" category="ADDONS"/>
+  <Binding name="CLICK TauntMasterForever_player:TMLeft" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_player:TMRight" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_party1:TMLeft" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_party1:TMRight" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_party2:TMLeft" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_party2:TMRight" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_party3:TMLeft" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_party3:TMRight" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_party4:TMLeft" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_party4:TMRight" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_ally:TMLeft" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_ally:TMRight" category="TauntMaster Forever"/>
 </Bindings>

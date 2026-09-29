@@ -92,6 +92,7 @@ function Methods:SetFormattedText(fmt, ...)
     self.__text = fmt:format(...)
 end
 function Methods:GetText() return self.__text end
+function Methods:SetVerticalScroll(v) self.__scroll = v end
 function Methods:SetChecked(v) self.__checked = v and true or false end
 function Methods:GetChecked() return self.__checked end
 function Methods:GetFont() return "Fonts\\FRIZQT__.TTF", 10, "" end
@@ -165,7 +166,7 @@ function GetBindingKey(cmd) return KEYBINDS[cmd] end
 function GetBindingText(key, short) return (short and key:gsub("^SHIFT%-", "s-")) or key end
 C_ChatInfo = { SendChatMessage = function(text, chat) CHAT[#CHAT + 1] = chat .. ":" .. text end }
 LE_PARTY_CATEGORY_INSTANCE = 2
-function PlaySound(k) log("SOUND", k) end
+function PlaySound(k, ch) log("SOUND", k, ch) end
 SOUNDKIT = { RAID_WARNING = 8959 }
 RAID_CLASS_COLORS = { DRUID = { r = 1, g = 0.49, b = 0.04 }, PRIEST = { r = 1, g = 1, b = 1 } }
 function RegisterUnitWatch() end

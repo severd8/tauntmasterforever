@@ -42,8 +42,10 @@ local function Check(parent, text, x, y, key, template, invert)
     return cb
 end
 
-local function Slider(parent, text, y, key, min, max, suffix, onChange, x)
+local function Slider(parent, text, y, key, min, max, suffix, onChange, x, step, fmt)
     suffix = suffix or ""
+    step = step or 1
+    fmt = fmt or "%d"
     local title = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     if x then
         title:SetPoint("TOP", parent, "TOPLEFT", x, y)
@@ -67,7 +69,7 @@ local function Slider(parent, text, y, key, min, max, suffix, onChange, x)
     end
     s:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
     s:SetMinMaxValues(min, max)
-    s:SetValueStep(1)
+    s:SetValueStep(step)
     if s.SetObeyStepsOnDrag then s:SetObeyStepsOnDrag(true) end
 
     local low = s:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -78,8 +80,9 @@ local function Slider(parent, text, y, key, min, max, suffix, onChange, x)
     high:SetText(max)
 
     s:SetScript("OnValueChanged", function(_, v)
-        v = math.floor(v + 0.5)
-        title:SetText(text .. ": |cffffd100" .. v .. suffix .. "|r")
+        v = math.floor(v / step + 0.5) * step
+        if step >= 1 then v = math.floor(v + 0.5) end
+        title:SetText(text .. ": |cffffd100" .. fmt:format(v) .. suffix .. "|r")
         if TM.db[key] ~= v then
             TM.db[key] = v
             if onChange then
@@ -93,7 +96,7 @@ local function Slider(parent, text, y, key, min, max, suffix, onChange, x)
     end)
     AddRefresher(function()
         s:SetValue(TM.db[key])
-        title:SetText(text .. ": |cffffd100" .. TM.db[key] .. suffix .. "|r")
+        title:SetText(text .. ": |cffffd100" .. fmt:format(TM.db[key]) .. suffix .. "|r")
     end)
     return s
 end
@@ -378,95 +381,12 @@ local function SpellButton(parent, text, x, y, key)
 end
 
 ---------------------------------------------------------------------------
--- One options window, four tabs: General, Advanced, Click Bindings, Extras
+-- One options window: a single scrolling page divided into sections
 ---------------------------------------------------------------------------
 local win
-local pages = {}
-local tabs = {}
 local spellRows = {}
-local LEFT_COL, RIGHT_COL = 130, 276   -- slider centers / right column start
-
--- General: the classic TauntMaster options
-local function BuildGeneralPage(page)
-    Slider(page, "Button Width", -12, "width", 50, 200, nil, nil, LEFT_COL)
-    Slider(page, "Button Height", -62, "height", 20, 60, nil, nil, LEFT_COL)
-    Slider(page, "Units Per Column", -112, "unitsPerColumn", 1, 20, nil, nil, LEFT_COL)
-    Slider(page, "Max Columns", -162, "maxColumns", 1, 8, nil, nil, LEFT_COL)
-    Slider(page, "Low Mana Warning At", -212, "manaWarnPct", 5, 50, "%",
-        function() TM:UpdateManaWarning() end, LEFT_COL)
-
-    SpellButton(page, "Left Click Spell", RIGHT_COL, -8, "1")
-    SpellButton(page, "Right Click Spell", RIGHT_COL, -64, "2")
-
-    local small = "GameFontNormalSmall"
-    Check(page, "Show Minimap Icon", RIGHT_COL, -122, "minimap", small)
-    Check(page, "Lock Frame", RIGHT_COL, -146, "locked", small)
-    Check(page, "Hide When Solo", RIGHT_COL, -170, "showSolo", small, true)
-    Check(page, "Hide Low Mana Warning", RIGHT_COL, -194, "hideManaWarning", small)
-
-    Label(page, "Taunt Cooldowns:", RIGHT_COL, -230, "GameFontNormal")
-    -- Mutually exclusive: checking one unchecks the other (unchecking both hides the icons)
-    local onCd = Check(page, "Show On Cooldown", RIGHT_COL, -248, "cdShowOnCooldown", small)
-    local ready = Check(page, "Show When Ready", RIGHT_COL, -272, "cdShowWhenReady", small)
-    local function exclusive(cb, key, other, otherKey)
-        cb:SetScript("OnClick", function(self)
-            TM.db[key] = self:GetChecked() and true or false
-            if TM.db[key] then
-                TM.db[otherKey] = false
-                other:SetChecked(false)
-            end
-            TM:UpdateCooldowns()
-        end)
-    end
-    exclusive(onCd, "cdShowOnCooldown", ready, "cdShowWhenReady")
-    exclusive(ready, "cdShowWhenReady", onCd, "cdShowOnCooldown")
-    Slider(page, "Icon Size", -302, "cdIconSize", 16, 64, nil, nil, RIGHT_COL + 110)
-end
-
--- Advanced: display extras, text size, announce
-local function BuildAdvancedPage(page)
-    Label(page, "Display", 16, -8, "GameFontNormalLarge")
-    Check(page, "Show bars", 16, -30, "shown")
-    Check(page, "Show in raids", 16, -56, "showInRaid")
-    Check(page, "Include yourself", 16, -82, "showPlayer")
-    Check(page, "Use class colors for names", 16, -108, "classColors")
-
-    local reset = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-    reset:SetSize(140, 22)
-    reset:SetPoint("TOPLEFT", 16, -144)
-    reset:SetText("Reset position")
-    reset:SetScript("OnClick", function() SlashCmdList.TAUNTMASTERFOREVER("reset") end)
-
-    Stepper(page, "Spacing", 270, -32, "spacing", 1, 0, 10, "%d")
-    Stepper(page, "Scale", 270, -58, "scale", 0.05, 0.5, 2, "%.2f")
-
-    Label(page, "Text Size", 270, -94, "GameFontNormalLarge")
-    Slider(page, "Header", -118, "headerFontSize", 8, 20, nil, function() TM:ApplyFonts() end, 380)
-    Slider(page, "Members", -168, "nameFontSize", 8, 20, nil, function() TM:ApplyFonts() end, 380)
-
-    Label(page, "Announce taunts", 16, -218, "GameFontNormalLarge")
-    Label(page, "Channel:", 16, -246)
-    local chan = Cycle(page, 120, TM.ANNOUNCE_CHANNELS, TM.ANNOUNCE_LABELS,
-        function() return TM.db.announceChannel end,
-        function(v) TM.db.announceChannel = v; TM:ApplyBindings() end)
-    chan:SetPoint("TOPLEFT", 80, -240)
-    AddRefresher(chan.Refresh)
-
-    Label(page, "Message:", 16, -276)
-    local msg = EditBox(page, 280)
-    msg:SetPoint("TOPLEFT", 86, -270)
-    msg:SetScript("OnEditFocusLost", function(self)
-        TM.db.announceText = self:GetText()
-        TM:ApplyBindings()
-    end)
-    AddRefresher(function() msg:SetText(TM.db.announceText or "") end)
-
-    local note = Label(page,
-        "{target} = the mob, {player} = the player you saved. Sent only when a taunt you\n" ..
-        "clicked actually casts. Say and Yell only work inside instances.",
-        16, -302, "GameFontDisableSmall")
-    note:SetJustifyH("LEFT")
-end
+local L_X, R_X = 16, 290          -- left / right column start
+local L_MID, R_MID = 140, 414     -- slider centers
 
 -- Click Bindings: every mouse button + modifier
 local STATUS_TEX = {
@@ -715,15 +635,12 @@ local function SaveSpellRows()
     TM.Print("click bindings saved.")
 end
 
-local function BuildBindingsPage(page)
-    local header = Label(page, "", 16, -8, "GameFontNormalLarge")
-    AddRefresher(function() header:SetText("Click bindings for your " .. (UnitClass("player"))) end)
+local function BuildBindingsSection(page, top)
+    Label(page, "Click", 16, top, "GameFontNormalSmall")
+    Label(page, "Action", 110, top, "GameFontNormalSmall")
+    Label(page, "Spell name or macro (use {unit} for the member)", 290, top, "GameFontNormalSmall")
 
-    Label(page, "Click", 16, -34, "GameFontNormalSmall")
-    Label(page, "Action", 110, -34, "GameFontNormalSmall")
-    Label(page, "Spell name or macro (use {unit} for the member)", 290, -34, "GameFontNormalSmall")
-
-    local y = -52
+    local y = top - 18
     for _, mod in ipairs(TM.MODS) do
         for _, b in ipairs(TM.BUTTONS) do
             local row = { key = mod .. b.id, kind = "none", label = TM.MOD_LABELS[mod] .. b.label }
@@ -783,107 +700,236 @@ local function BuildBindingsPage(page)
     AddRefresher(RefreshSpellRows)
 end
 
--- Extras
-local function BuildExtrasPage(page)
-    Label(page, "Aggro", 16, -8, "GameFontNormalLarge")
-    Check(page, "Play a sound when someone else pulls aggro", 16, -30, "aggroSound")
-    Check(page, "Flash their bar while they have aggro", 16, -56, "flashAggro")
+---------------------------------------------------------------------------
+-- Sections. Each builds inside its own frame and returns its height.
+---------------------------------------------------------------------------
+local SMALL = "GameFontHighlightSmall"
 
-    Label(page, "Bars", 16, -94, "GameFontNormalLarge")
-    Check(page, "Show health % (replaces the aggro words)", 16, -116, "healthText")
-    Check(page, "Fade bars your taunt can't reach (red X = no enemy targeted)", 16, -142, "rangeFade")
-    Check(page, "Show role icons", 16, -168, "roleIcons")
-    Check(page, "Sort by role: tanks, healers, then damage", 16, -194, "sortByRole")
-    local sortNote = Label(page, "Sorting only updates out of combat. In raids, sorts within each group.", 44, -216, "GameFontDisableSmall")
-    sortNote:SetJustifyH("LEFT")
-
-    Label(page, "Bar texture:", 16, -242)
-    local tex = Cycle(page, 120, TM.TEXTURE_KEYS, TM.TEXTURE_LABELS,
-        function() return TM.db.barTexture end,
-        function(v) TM.db.barTexture = v; TM:ApplyFonts() end)
-    tex:SetPoint("TOPLEFT", 110, -236)
-    AddRefresher(tex.Refresh)
-
-    Label(page, "Tanking", 16, -278, "GameFontNormalLarge")
-    Check(page, "Show your target's target (click it to taunt your target)", 16, -300, "showToT")
-    Check(page, "Only show in Defensive Stance / Bear Form", 16, -326, "tankOnly")
-    local tankNote = Label(page, "Paladins have no tank stance, so this does nothing for them.", 44, -348, "GameFontDisableSmall")
-    tankNote:SetJustifyH("LEFT")
-
-    Label(page, "Controller & keybindings", 16, -374, "GameFontNormalLarge")
-    Check(page, "Show keybinding hints beside party bars", 16, -396, "keyHints")
-    local keyNote = Label(page,
-        "Set keys or controller buttons in Options > Keybindings > TauntMaster Forever.",
-        44, -418, "GameFontDisableSmall")
-    keyNote:SetJustifyH("LEFT")
+local function Note(page, text, x, y)
+    local n = Label(page, text, x, y, "GameFontDisableSmall")
+    n:SetJustifyH("LEFT")
+    return n
 end
 
-TM._spellRows = spellRows
-TM._suggest = function() return suggest end
+local function RowLabel(page, text, x, y)
+    return Label(page, text, x, y - 4, "GameFontNormal")
+end
 
-local TAB_ORDER = {
-    { key = "general",  label = "General",        build = BuildGeneralPage },
-    { key = "advanced", label = "Advanced",       build = BuildAdvancedPage },
-    { key = "bindings", label = "Click Bindings", build = BuildBindingsPage },
-    { key = "extras",   label = "Extras",         build = BuildExtrasPage },
+local SECTIONS = {
+    { key = "spells", title = "Taunt Spells",
+      sub = "Click a button to pick from your class's taunts. More buttons and modifiers are under Click Bindings.",
+      build = function(p, top)
+          SpellButton(p, "Left Click Spell", L_X, top, "1")
+          SpellButton(p, "Right Click Spell", R_X, top, "2")
+          return -top + 56
+      end },
+
+    { key = "layout", title = "Layout",
+      sub = "Size and position changes wait until combat ends.",
+      build = function(p, top)
+          Slider(p, "Button Width", top, "width", 50, 200, nil, nil, L_MID)
+          Slider(p, "Button Height", top - 50, "height", 20, 60, nil, nil, L_MID)
+          Slider(p, "Units Per Column", top - 100, "unitsPerColumn", 1, 20, nil, nil, L_MID)
+          Slider(p, "Max Columns", top - 0, "maxColumns", 1, 8, nil, nil, R_MID)
+          Slider(p, "Spacing", top - 50, "spacing", 0, 10, nil, nil, R_MID)
+          Slider(p, "Scale", top - 100, "scale", 0.5, 2, nil, nil, R_MID, 0.05, "%.2f")
+          local y = top - 150
+          Check(p, "Lock frame", L_X, y, "locked", SMALL)
+          Check(p, "Include yourself", L_X, y - 24, "showPlayer", SMALL)
+          Check(p, "Show in raids", L_X, y - 48, "showInRaid", SMALL)
+          Check(p, "Hide when solo", R_X, y, "showSolo", SMALL, true)
+          Check(p, "Only in Defensive Stance / Bear Form", R_X, y - 24, "tankOnly", SMALL)
+          Check(p, "Sort by role (tanks, healers, damage)", R_X, y - 48, "sortByRole", SMALL)
+          local reset = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+          reset:SetSize(130, 22)
+          reset:SetPoint("TOPLEFT", L_X, y - 80)
+          reset:SetText("Reset position")
+          reset:SetScript("OnClick", function() SlashCmdList.TAUNTMASTERFOREVER("reset") end)
+          return -(y - 80) + 30
+      end },
+
+    { key = "appearance", title = "Appearance",
+      build = function(p, top)
+          Check(p, "Class colors for names", L_X, top, "classColors", SMALL)
+          Check(p, "Role icons", L_X, top - 24, "roleIcons", SMALL)
+          Check(p, "Health % instead of aggro words", L_X, top - 48, "healthText", SMALL)
+          RowLabel(p, "Bar texture", R_X, top)
+          local tex = Cycle(p, 120, TM.TEXTURE_KEYS, TM.TEXTURE_LABELS,
+              function() return TM.db.barTexture end,
+              function(v) TM.db.barTexture = v; TM:ApplyFonts() end)
+          tex:SetPoint("TOPLEFT", R_X + 100, top + 2)
+          AddRefresher(tex.Refresh)
+          Slider(p, "Header Text Size", top - 32, "headerFontSize", 8, 20, nil, function() TM:ApplyFonts() end, R_MID)
+          Slider(p, "Member Text Size", top - 82, "nameFontSize", 8, 20, nil, function() TM:ApplyFonts() end, R_MID)
+          return -(top - 82) + 50
+      end },
+
+    { key = "aggro", title = "Aggro Alerts",
+      sub = "For anyone other than you or another tank.",
+      build = function(p, top)
+          Check(p, "Flash bar while they have aggro", L_X, top, "flashAggro", SMALL)
+          Check(p, "Play a sound", L_X, top - 24, "aggroSound", SMALL)
+          local cx = R_X + 90
+          RowLabel(p, "Sound", R_X, top)
+          local snd = Cycle(p, 120, TM.AGGRO_SOUND_KEYS, TM.AGGRO_SOUND_LABELS,
+              function() return TM.db.aggroSoundKey end,
+              function(v) TM.db.aggroSoundKey = v; TM:TestAggroSound() end)
+          snd:SetPoint("TOPLEFT", cx, top + 2)
+          AddRefresher(snd.Refresh)
+          local test = CreateFrame("Button", nil, p, "UIPanelButtonTemplate")
+          test:SetSize(50, 22)
+          test:SetPoint("LEFT", snd, "RIGHT", 4, 0)
+          test:SetText("Test")
+          test:SetScript("OnClick", function() TM:TestAggroSound() end)
+          RowLabel(p, "Alert when", R_X, top - 28)
+          local lvl = Cycle(p, 174, TM.AGGRO_LEVEL_KEYS, TM.AGGRO_LEVEL_LABELS,
+              function() return TM.db.aggroSoundLevel end,
+              function(v) TM.db.aggroSoundLevel = v end)
+          lvl:SetPoint("TOPLEFT", cx, top - 26)
+          AddRefresher(lvl.Refresh)
+          RowLabel(p, "Volume slider", R_X, top - 56)
+          local ch = Cycle(p, 120, TM.SOUND_CHANNEL_KEYS, TM.SOUND_CHANNEL_LABELS,
+              function() return TM.db.aggroSoundChannel end,
+              function(v) TM.db.aggroSoundChannel = v; TM:TestAggroSound() end)
+          ch:SetPoint("TOPLEFT", cx, top - 54)
+          AddRefresher(ch.Refresh)
+          return -(top - 56) + 34
+      end },
+
+    { key = "reach", title = "Reach",
+      build = function(p, top)
+          Check(p, "Fade bars your taunt can't reach", L_X, top, "rangeFade", SMALL)
+          Note(p, "Red X beside a bar = that player has no enemy targeted, so clicking it won't taunt anything.", L_X + 28, top - 24)
+          return -top + 44
+      end },
+
+    { key = "cooldowns", title = "Taunt Cooldowns",
+      build = function(p, top)
+          -- Mutually exclusive: checking one unchecks the other (unchecking both hides the icons)
+          local onCd = Check(p, "Show on cooldown", L_X, top, "cdShowOnCooldown", SMALL)
+          local ready = Check(p, "Show when ready", L_X, top - 24, "cdShowWhenReady", SMALL)
+          local function exclusive(cb, key, other, otherKey)
+              cb:SetScript("OnClick", function(self)
+                  TM.db[key] = self:GetChecked() and true or false
+                  if TM.db[key] then
+                      TM.db[otherKey] = false
+                      other:SetChecked(false)
+                  end
+                  TM:UpdateCooldowns()
+              end)
+          end
+          exclusive(onCd, "cdShowOnCooldown", ready, "cdShowWhenReady")
+          exclusive(ready, "cdShowWhenReady", onCd, "cdShowOnCooldown")
+          Slider(p, "Icon Size", top, "cdIconSize", 16, 64, nil, nil, R_MID)
+          return -top + 56
+      end },
+
+    { key = "mana", title = "Low Mana Warning",
+      sub = "Shows beside your bar and your healers' bars.",
+      build = function(p, top)
+          Check(p, "Show low mana warning", L_X, top, "hideManaWarning", SMALL, true)
+          Slider(p, "Warn at", top, "manaWarnPct", 5, 50, "%", function() TM:UpdateManaWarning() end, R_MID)
+          return -top + 56
+      end },
+
+    { key = "announce", title = "Announcements",
+      build = function(p, top)
+          RowLabel(p, "Channel", L_X, top)
+          local chan = Cycle(p, 120, TM.ANNOUNCE_CHANNELS, TM.ANNOUNCE_LABELS,
+              function() return TM.db.announceChannel end,
+              function(v) TM.db.announceChannel = v end)
+          chan:SetPoint("TOPLEFT", L_X + 90, top + 2)
+          AddRefresher(chan.Refresh)
+          RowLabel(p, "Message", L_X, top - 30)
+          local msg = EditBox(p, 420)
+          msg:SetPoint("TOPLEFT", L_X + 96, top - 28)
+          msg:SetScript("OnEditFocusLost", function(self) TM.db.announceText = self:GetText() end)
+          AddRefresher(function() msg:SetText(TM.db.announceText or "") end)
+          Note(p, "{target} = the mob, {player} = the player you saved. Sent only when a taunt you clicked\n" ..
+              "actually casts. Say and Yell only work inside instances.", L_X, top - 56)
+          return -top + 80
+      end },
+
+    { key = "tot", title = "Target's Target",
+      build = function(p, top)
+          Check(p, "Show your target's target bar", L_X, top, "showToT", SMALL)
+          Note(p, "Shows who your target is hitting. Click it to taunt your own target.", L_X + 28, top - 24)
+          return -top + 44
+      end },
+
+    { key = "keys", title = "Controller & Keybindings",
+      build = function(p, top)
+          Check(p, "Show keybinding hints beside party bars", L_X, top, "keyHints", SMALL)
+          Note(p, "Set keys or controller buttons in Options > Keybindings > TauntMaster Forever.", L_X + 28, top - 24)
+          return -top + 44
+      end },
+
+    { key = "bindings", title = "Click Bindings",
+      sub = "Every mouse button and modifier. Spell names autocomplete and are checked as you type.",
+      build = function(p, top)
+          BuildBindingsSection(p, top)
+          -- 12 rows of 25, then the buttons and message line
+          return -top + 18 + 12 * 25 + 60
+      end },
+
+    { key = "general", title = "General",
+      build = function(p, top)
+          Check(p, "Show minimap icon", L_X, top, "minimap", SMALL)
+          Check(p, "Show welcome screen after updates", L_X, top - 24, "showSplash", SMALL)
+          return -top + 44
+      end },
 }
 
--- Selected tab: normal red button with gold text. Others: greyed-out art and grey text (still clickable).
-local function StyleTab(tab, selected)
-    local hl = tab:GetHighlightTexture()
-    for _, r in ipairs({ tab:GetRegions() }) do
-        if r ~= hl and r.GetObjectType and r:GetObjectType() == "Texture" and r.SetDesaturated then
-            r:SetDesaturated(not selected)
-        end
-    end
-    tab:SetNormalFontObject(selected and GameFontNormal or GameFontDisable)
-    tab:SetHighlightFontObject(GameFontHighlight)
-end
-
-local function ShowPage(name)
-    for k, p in pairs(pages) do p:SetShown(k == name) end
-    for k, t in pairs(tabs) do StyleTab(t, k == name) end
-end
+local sectionOffsets = {}
 
 local function BuildWindow()
-    win = Window("TauntMasterForeverConfig", "TauntMaster Forever Options", 520, 560)
+    win = Window("TauntMasterForeverConfig", "TauntMaster Forever Options", 600, 560)
 
-    local prev
-    for _, t in ipairs(TAB_ORDER) do
-        local tab = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
-        tab:SetSize(118, 22)
-        if prev then
-            tab:SetPoint("LEFT", prev, "RIGHT", 4, 0)
-        else
-            tab:SetPoint("TOPLEFT", 12, -30)
+    local scroll = CreateFrame("ScrollFrame", "TauntMasterForeverConfigScroll", win, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 6, -28)
+    scroll:SetPoint("BOTTOMRIGHT", -30, 42)
+    local content = CreateFrame("Frame", nil, scroll)
+    content:SetSize(560, 10)
+    scroll:SetScrollChild(content)
+    win.scroll = scroll
+
+    local y = 0
+    for _, sec in ipairs(SECTIONS) do
+        local f = CreateFrame("Frame", nil, content)
+        f:SetPoint("TOPLEFT", 0, -y)
+        f:SetWidth(560)
+        Label(f, sec.title, 12, -10, "GameFontNormalLarge")
+        local top = -36
+        if sec.sub then
+            Note(f, sec.sub, 12, -30)
+            top = -50
         end
-        tab:SetText(t.label)
-        tab:SetScript("OnClick", function() ShowPage(t.key) end)
-        tabs[t.key] = tab
-        prev = tab
-
-        local p = CreateFrame("Frame", nil, win)
-        p:SetPoint("TOPLEFT", 4, -58)
-        p:SetPoint("BOTTOMRIGHT", -4, 40)
-        pages[t.key] = p
-        t.build(p)
+        local h = sec.build(f, top) + 16
+        f:SetHeight(h)
+        local line = f:CreateTexture(nil, "ARTWORK")
+        line:SetPoint("BOTTOMLEFT", 10, 2)
+        line:SetPoint("BOTTOMRIGHT", -6, 2)
+        line:SetHeight(1)
+        line:SetColorTexture(0.29, 0.25, 0.16, 0.8)
+        sectionOffsets[sec.key] = y
+        y = y + h
     end
+    content:SetHeight(y + 10)
 
     local close = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
     close:SetSize(100, 22)
     close:SetPoint("BOTTOMRIGHT", -14, 12)
     close:SetText("Close")
     close:SetScript("OnClick", function() win:Hide() end)
-
-    ShowPage("general")
 end
 
 ---------------------------------------------------------------------------
 -- Entry point: /tm, minimap, header menu
---   nil toggles the window; "display"/"general", "advanced", "spells"/"bindings", "extras" open a tab
+--   nil toggles the window; a name scrolls to that section
+--   (older names like "display", "advanced", "extras" still work)
 ---------------------------------------------------------------------------
-local PAGE_ALIASES = { display = "general", general = "general", advanced = "advanced",
-    spells = "bindings", bindings = "bindings", extras = "extras" }
+local SECTION_ALIASES = { display = "spells", general = "spells", advanced = "appearance",
+    spells = "bindings", bindings = "bindings", extras = "aggro" }
 
 function TM:OpenConfig(page)
     if not win then BuildWindow() end
@@ -893,5 +939,10 @@ function TM:OpenConfig(page)
     end
     win:Show()
     win:Raise()
-    ShowPage(PAGE_ALIASES[page] or "general")
+    local key = SECTION_ALIASES[page] or page
+    win.scroll:SetVerticalScroll(sectionOffsets[key] or 0)
 end
+
+TM._spellRows = spellRows
+TM._suggest = function() return suggest end
+TM._sectionOffsets = sectionOffsets

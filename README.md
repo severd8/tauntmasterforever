@@ -21,10 +21,10 @@ It's a from-scratch rebuild of the classic *TauntMaster* addon, written for Fore
 - **Taunt picker** — choose from every taunt your class has, with icons. Spells you haven't learned yet are marked.
 - **Taunt cooldown icons** — see when your taunts are on cooldown, or when they're ready.
 - **Low mana warning** — shows next to your bar and your healers' bars when mana drops below the level you choose.
-- **Aggro alerts** — optional flashing bar and sound when someone else pulls a mob.
+- **Aggro alerts** — optional flashing bar and sound when someone else pulls a mob. Pick the sound, when it plays (close to pulling, has aggro, or firmly has aggro) and which volume slider it follows.
 - **Target's target bar** — see who your target is hitting, and click it to taunt your target.
 - **Raid support** — raid bars are grouped by raid group.
-- **Extras** — health %, range fading, role icons, sort by role, bar textures, text sizes, class colors, and a "only show in Defensive Stance / Bear Form" mode.
+- **Customizable** — health %, range fading, role icons, sort by role, bar textures, text sizes, class colors, and a "only show in Defensive Stance / Bear Form" mode.
 - **Taunt announcements** — optionally announce your taunts in party, raid, instance or raid warning chat, like "Defias Thug has been taunted off of Aeri!". Sent only when the taunt actually casts. Use `{target}` and `{player}` in your own message.
 
 ## Installation
@@ -60,12 +60,22 @@ Taunts cast on "their target" go to the enemy the clicked player is fighting. Bl
 
 ### Options window
 
-| Tab | What's there |
+All settings are on one scrolling page, in sections:
+
+| Section | What's there |
 |---|---|
-| **General** | Bar size, units per column, max columns, Left/Right Click spells, minimap icon, lock, hide when solo, low mana warning, taunt cooldown icons |
-| **Advanced** | Show bars, show in raids, include yourself, class colors, spacing, scale, text sizes, taunt announcements, reset position |
+| **Taunt Spells** | Left and Right Click spell pickers |
+| **Layout** | Bar size, units per column, max columns, spacing, scale, lock, include yourself, show in raids, hide when solo, tank-stance-only mode, sort by role, reset position |
+| **Appearance** | Class colors, role icons, health %, bar texture, text sizes |
+| **Aggro Alerts** | Flash bar, aggro sound, sound choice with a Test button, when it plays, volume slider |
+| **Reach** | Fade bars your taunt can't reach (red X = no enemy targeted) |
+| **Taunt Cooldowns** | Show on cooldown or when ready, icon size |
+| **Low Mana Warning** | On/off and the percentage it warns at |
+| **Announcements** | Chat channel and message |
+| **Target's Target** | Show the target's target bar |
+| **Controller & Keybindings** | Keybinding hints beside party bars |
 | **Click Bindings** | Every mouse button and modifier, with spell names or macros |
-| **Extras** | Aggro sound and flash, health %, range fade, role icons, sort by role, bar texture, target's target, tank-stance-only mode |
+| **General** | Minimap icon, welcome screen after updates |
 
 In a custom macro, `{unit}` is replaced with the clicked player (for example `/cast [@{unit}target] Growl`).
 
@@ -79,7 +89,7 @@ Prefer a controller, or keys instead of clicking? Go to **Options → Keybinding
 | **You / Party 1–4: Right Click spell** | Casts your Right Click spell for that player |
 | **Targeted ally: Left / Right Click spell** | Target a friendly player, then press it to taunt whatever is attacking them. Works in raids too. |
 
-Bound keys appear beside each party bar, so you always know which button saves whom. Turn the hints off on the **Extras** tab.
+Bound keys appear beside each party bar, so you always know which button saves whom. Turn the hints off in the **Controller & Keybindings** section of the options.
 
 ### Slash commands
 
@@ -88,7 +98,7 @@ Bound keys appear beside each party bar, so you always know which button saves w
 | `/tm` | Open or close the options |
 | `/tm show` · `/tm hide` · `/tm toggle` | Show or hide the bars |
 | `/tm lock` · `/tm unlock` | Lock or unlock the bars' position |
-| `/tm display` · `/tm advanced` · `/tm spells` · `/tm extras` | Open a specific options tab |
+| `/tm spells` | Open the options at Click Bindings |
 | `/tm check` | Check that your bound spells exist and are learned |
 | `/tm news` | Show the welcome / what's new window |
 | `/tm reset` | Move the bars back to the middle of the screen |
@@ -107,7 +117,7 @@ WoW: Forever runs on the modern addon system, which hides some combat informatio
 
 ## Troubleshooting
 
-- **A click does nothing** — type `/tm check`. It lists each bound spell and whether it was found and learned. Fix any misspelled spell on the **Click Bindings** tab.
+- **A click does nothing** — type `/tm check`. It lists each bound spell and whether it was found and learned. Fix any misspelled spell in the **Click Bindings** section.
 - **The bars disappeared** — you may have hidden them, or turned on **Hide When Solo** or tank-stance-only mode. Type `/tm show`.
 - **The bars are off-screen** — type `/tm reset`.
 

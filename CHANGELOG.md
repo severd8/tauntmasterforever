@@ -1,3 +1,10 @@
+## 1.11.0
+
+- All settings are now on one scrolling page, divided into sections: Taunt Spells, Layout, Appearance, Aggro Alerts, Reach, Taunt Cooldowns, Low Mana Warning, Announcements, Target's Target, Controller & Keybindings, Click Bindings and General.
+- New aggro sound options: choose the sound (with a Test button), when it plays (close to pulling, has aggro, or firmly has aggro), and which volume slider it follows (Master, Sound Effects or Dialog).
+- New: turn the welcome screen on or off in the General section.
+- Scale now uses a slider. "Hide low mana warning" is now "Show low mana warning".
+
 ## 1.10.0
 
 - New: welcome screen with quick-start tips and the latest changes. It shows once after each update (and on first install). Turn it off with the checkbox at the bottom, and reopen it anytime with /tm news.

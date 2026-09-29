@@ -117,6 +117,9 @@ local DEFAULTS = {
     nameFontSize = 10,
     classColors = true,
     aggroSound = false,
+    aggroSoundKey = "raidwarning",
+    aggroSoundLevel = 2,       -- 1 = yellow, 2 = orange/red, 3 = red only
+    aggroSoundChannel = "Master",
     flashAggro = true,
     sortByRole = false,
     healthText = false,
@@ -336,14 +339,38 @@ local function SetFlash(btn, on)
     end
 end
 
-local lastAggroSound = 0
-local function PlayAggroSound()
-    local now = GetTime()
-    if now - lastAggroSound < 1.5 then return end
-    lastAggroSound = now
-    local kit = SOUNDKIT and SOUNDKIT.RAID_WARNING or 8959
-    pcall(PlaySound, kit, "Master")
+-- Aggro sound choices. SOUNDKIT names are looked up first; the numbers are fallbacks.
+TM.AGGRO_SOUNDS = {
+    { key = "raidwarning", label = "Raid Warning", kit = "RAID_WARNING", id = 8959 },
+    { key = "readycheck",  label = "Ready Check",  kit = "READY_CHECK", id = 8960 },
+    { key = "alarm",       label = "Alarm Clock",  kit = "ALARM_CLOCK_WARNING_3", id = 12889 },
+    { key = "bosswarning", label = "Boss Warning", kit = "UI_RAID_BOSS_WHISPER_WARNING", id = 37666 },
+}
+TM.AGGRO_SOUND_KEYS, TM.AGGRO_SOUND_LABELS = {}, {}
+for _, s in ipairs(TM.AGGRO_SOUNDS) do
+    table.insert(TM.AGGRO_SOUND_KEYS, s.key)
+    TM.AGGRO_SOUND_LABELS[s.key] = s.label
 end
+TM.AGGRO_LEVEL_KEYS = { 1, 2, 3 }
+TM.AGGRO_LEVEL_LABELS = { "Close to pulling (yellow)", "Has aggro (orange/red)", "Firmly has aggro (red)" }
+TM.SOUND_CHANNEL_KEYS = { "Master", "SFX", "Dialog" }
+TM.SOUND_CHANNEL_LABELS = { Master = "Master", SFX = "Sound Effects", Dialog = "Dialog" }
+
+local lastAggroSound = 0
+local function PlayAggroSound(force)
+    local now = GetTime()
+    if not force and now - lastAggroSound < 1.5 then return end
+    lastAggroSound = now
+    local choice = TM.AGGRO_SOUNDS[1]
+    for _, s in ipairs(TM.AGGRO_SOUNDS) do
+        if s.key == TM.db.aggroSoundKey then choice = s end
+    end
+    local kit = (SOUNDKIT and SOUNDKIT[choice.kit]) or choice.id
+    pcall(PlaySound, kit, TM.db.aggroSoundChannel or "Master")
+end
+
+-- "Test" button and picking a new sound in the options
+function TM:TestAggroSound() PlayAggroSound(true) end
 
 -- Health % text. Health can be secret; the game formats it for us when it is.
 local function SetHealthText(fs, unit)
@@ -480,9 +507,11 @@ function TM:UpdateButton(btn)
     -- Someone other than you (and not another tank) has pulled aggro
     local isMe = UnitIsUnit(unit, "player")
     if IsSecret(isMe) then isMe = false end
-    local stolen = threat >= 2 and not isMe and role ~= "TANK" and not btn.isToT
-    SetFlash(btn, db.flashAggro and stolen)
-    if db.aggroSound and stolen and (btn.lastThreat or 0) < 2 then
+    local watched = not isMe and role ~= "TANK" and not btn.isToT
+    SetFlash(btn, db.flashAggro and watched and threat >= 2)
+    -- Sound plays once when they cross the chosen level (yellow, orange/red or red)
+    local level = db.aggroSoundLevel or 2
+    if db.aggroSound and watched and threat >= level and (btn.lastThreat or 0) < level then
         PlayAggroSound()
     end
     btn.lastThreat = threat
@@ -1387,7 +1416,7 @@ local function Help()
     print("  /tm — open options")
     print("  /tm show | hide | toggle — show or hide the bars")
     print("  /tm lock | unlock — lock or unlock the bars' position")
-    print("  /tm display | advanced | spells | extras — open that tab")
+    print("  /tm spells — jump to Click Bindings in the options")
     print("  /tm check — verify your bound spells exist in Forever")
     print("  /tm news — show the welcome / what's new window")
     print("  /tm reset — move the bars back to the default position")

@@ -509,6 +509,79 @@ local cf = assert(io.open(ADDON_DIR .. "/CHANGELOG.md")); local topVersion = cf:
 assertEq(TM:CurrentNewsVersion(), topVersion, "News.lua top version matches CHANGELOG.md")
 for _, e in ipairs(TM.NEWS) do assert(e.version and e.date and #e.items > 0, "news entry complete") end
 
+step("single-page settings")
+TM:OpenConfig(); TM:OpenConfig()          -- close then reopen
+local cfg = TauntMasterForeverConfig
+assert(cfg.__shown, "options open")
+-- Sections in order, each below the last
+local order = { "spells", "layout", "appearance", "aggro", "reach", "cooldowns", "mana",
+    "announce", "tot", "keys", "bindings", "general" }
+local prev = -1
+for _, k in ipairs(order) do
+    local off = TM._sectionOffsets[k]
+    assert(off and off > prev, "section in order: " .. k)
+    prev = off
+end
+-- Old tab names and /tm spells scroll to the right section
+TM:OpenConfig("spells"); assertEq(cfg.scroll.__scroll, TM._sectionOffsets.bindings, "/tm spells -> Click Bindings")
+TM:OpenConfig("extras"); assertEq(cfg.scroll.__scroll, TM._sectionOffsets.aggro, "extras -> Aggro Alerts")
+TM:OpenConfig("display"); assertEq(cfg.scroll.__scroll, 0, "display -> top")
+-- No tab buttons left
+local function walk(f, fn) fn(f) for _, c in ipairs(f.__children or {}) do walk(c, fn) end end
+walk(cfg, function(f)
+    if f.__kind == "Button" then
+        for _, t in ipairs({ "General", "Advanced", "Extras" }) do assert(f.__text ~= t, "leftover tab: " .. t) end
+    end
+end)
+-- Scale slider moves in 0.05 steps
+local scaleSlider
+walk(cfg, function(f) if f.__kind == "Slider" then
+    f.__scripts.OnValueChanged(f, 1.23)
+    if TM.db.scale and math.abs(TM.db.scale - 1.25) < 0.001 then scaleSlider = f end
+end end)
+assert(scaleSlider, "scale slider rounds to 0.05")
+TM.db.scale = 1; TM.db.width = 120; TM.db.height = 24; TM.db.unitsPerColumn = 5; TM.db.maxColumns = 8
+TM.db.spacing = 2; TM.db.headerFontSize = 10; TM.db.nameFontSize = 10; TM.db.cdIconSize = 26; TM.db.manaWarnPct = 20
+TM:ApplySettings()
+for _, b in ipairs(TM.partyButtons) do b:Show() end   -- the game's unit watcher re-shows these
+-- Show welcome screen checkbox is in General
+local found = false
+walk(cfg, function(f) if f.__kind == "FontString" and f.__text == "Show welcome screen after updates" then found = true end end)
+assert(found, "welcome screen checkbox present")
+
+step("aggro sound options")
+local function soundsSince(n) local out = {} for i = n + 1, #LOG do if LOG[i]:find("^SOUND") then out[#out + 1] = LOG[i] end end return out end
+STATE.inGroup, STATE.party = true, 2
+STATE.unitsExist = { player = true, party1 = true, party2 = true }
+STATE.roles = { player = "TANK", party1 = "HEALER", party2 = "DAMAGER" }
+TM.db.aggroSound = true
+TM.db.aggroSoundLevel, TM.db.aggroSoundKey, TM.db.aggroSoundChannel = 2, "raidwarning", "Master"
+local function threatTo(t) STATE.threat.party2 = t; FAKE_TIME = FAKE_TIME + 2; tick() end
+-- Default: orange/red, Raid Warning, Master
+threatTo(0); local n = #LOG
+threatTo(1); assertEq(#soundsSince(n), 0, "no sound at yellow by default")
+threatTo(2); local s = soundsSince(n); assertEq(#s, 1, "sound at orange"); assertEq(s[1], "SOUND 8959 Master", "raid warning on master")
+-- Yellow level
+TM.db.aggroSoundLevel = 1; threatTo(0); n = #LOG
+threatTo(1); assertEq(#soundsSince(n), 1, "yellow level alerts at yellow")
+threatTo(3); assertEq(#soundsSince(n), 1, "no repeat while it stays high")
+-- Red-only level
+TM.db.aggroSoundLevel = 3; threatTo(0); n = #LOG
+threatTo(2); assertEq(#soundsSince(n), 0, "red-only ignores orange")
+threatTo(3); assertEq(#soundsSince(n), 1, "red-only alerts at red")
+-- Sound and channel choices
+TM.db.aggroSoundKey = "readycheck"; TM.db.aggroSoundChannel = "SFX"; TM.db.aggroSoundLevel = 2
+threatTo(0); n = #LOG; threatTo(2)
+assertEq(soundsSince(n)[1], "SOUND 8960 SFX", "picked sound and channel")
+-- Test button plays even right after an alert
+n = #LOG; TM:TestAggroSound(); TM:TestAggroSound()
+assertEq(#soundsSince(n), 2, "test ignores the 1.5s limit")
+-- Tanks and you never trigger it
+STATE.roles.party2 = "TANK"; threatTo(0); n = #LOG; threatTo(3)
+assertEq(#soundsSince(n), 0, "other tanks don't trigger it")
+STATE.roles.party2 = "DAMAGER"; STATE.threat.party2 = 0; tick()
+TM.db.aggroSound = false; TM.db.aggroSoundKey = "raidwarning"; TM.db.aggroSoundChannel = "Master"
+
 step("header menu")
 MENUS = {}
 TM.handle.__scripts.OnMouseUp(TM.handle, "RightButton")

@@ -6,6 +6,10 @@ local ADDON, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.11.0", date = "2026-09-29", items = {
+        "All settings are on one scrolling page, divided into sections.",
+        "Aggro sound: choose the sound, when it plays, and which volume slider it follows.",
+    } },
     { version = "1.10.0", date = "2026-09-29", items = {
         "Welcome screen with quick-start tips and recent changes. Reopen it with /tm news.",
     } },

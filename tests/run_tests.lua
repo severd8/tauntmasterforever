@@ -352,6 +352,59 @@ click(bar); cast(6795)
 assertEq(#CHAT, 0, "announcements off")
 FAKE_TIME = FAKE_TIME + 3
 
+step("keybindings and controller support")
+-- Every binding in Bindings.xml has a readable name
+local f = assert(io.open(ADDON_DIR .. "/Bindings.xml")); local xml = f:read("*a"); f:close()
+local count = 0
+for name in xml:gmatch('name="([^"]+)"') do
+    count = count + 1
+    assert(_G["BINDING_NAME_" .. name], "missing binding name for " .. name)
+end
+assertEq(count, 12, "12 keybindings")
+assertEq(BINDING_HEADER_TAUNTMASTERFOREVER, "TauntMaster Forever", "binding header")
+-- Keybinding presses use the plain Left/Right Click spell, whatever modifier is held
+TM:GetBindings()["shift-1"] = { kind = "enemy", text = "Taunt" }
+TM:ApplyBindings()
+local p1 = TM.unitToButton.party1
+assertEq(p1.__attrs["*macrotext-tmleft"], "/cast [@party1target,harm,nodead] Growl", "party1 left keybind")
+assertEq(p1.__attrs["*macrotext-tmright"], "/cast Challenging Roar", "party1 right keybind")
+assertEq(p1.__attrs["shift-macrotext1"], "/cast [@party1target,harm,nodead] Taunt", "mouse shift-click unchanged")
+-- Targeted ally button taunts what's attacking your friendly target
+local ally = TauntMasterForever_ally
+assertEq(ally.__attrs["*macrotext-tmleft"], "/cast [@targettarget,harm,nodead] Growl", "ally keybind macro")
+-- Middle-click style bindings map to the secure type
+TM:GetBindings()["2"] = { kind = "target", text = "" }; TM:ApplyBindings()
+assertEq(p1.__attrs["*type-tmright"], "target", "non-spell keybind type")
+assertEq(p1.__attrs["*macrotext-tmright"], nil, "no leftover macro")
+TM.db.bindings.DRUID = TM:DefaultBindings(); TM:ApplyBindings()
+-- Announcements work from keybindings, ignoring held modifiers
+TM.db.announceChannel = "PARTY"; STATE.inGroup = true; CHAT = {}
+MOD_KEYS.shift = true; p1.__scripts.PreClick(p1, "TMLeft"); MOD_KEYS.shift = false
+fire("UNIT_SPELLCAST_SUCCEEDED", "player", "g", 6795)
+assertEq(#CHAT, 1, "keybind taunt announced")
+FAKE_TIME = FAKE_TIME + 3; CHAT = {}
+ally.__scripts.PreClick(ally, "TMLeft"); fire("UNIT_SPELLCAST_SUCCEEDED", "player", "g", 6795)
+assertEq(#CHAT, 1, "ally keybind announced")
+TM.db.announceChannel = "none"; FAKE_TIME = FAKE_TIME + 3
+-- Hints beside bars
+KEYBINDS["CLICK TauntMasterForever_party1:TMLeft"] = "PAD1"
+KEYBINDS["CLICK TauntMasterForever_party1:TMRight"] = "SHIFT-PAD1"
+KEYBINDS["CLICK TauntMasterForever_party2:TMRight"] = "PAD2"
+fire("UPDATE_BINDINGS")
+assertEq(p1.keyHint:GetText(), "PAD1 / s-PAD1", "hint shows both keys, short form")
+assertEq(p1.keyHint.__shown, true, "hint visible")
+assertEq(TM.unitToButton.party2.keyHint:GetText(), "PAD2", "single binding hint")
+assertEq(TM.unitToButton.party3.keyHint.__shown, false, "no hint without bindings")
+TM.db.keyHints = false; TM:ApplySettings()
+assertEq(p1.keyHint.__shown, false, "hints can be turned off")
+TM.db.keyHints = true; KEYBINDS = {}; TM:ApplySettings()
+assertEq(p1.keyHint.__shown, false, "hint gone when unbound")
+-- Nothing protected changes when bindings update mid-fight
+COMBAT = true; BLOCKED = {}
+KEYBINDS["CLICK TauntMasterForever_player:TMLeft"] = "PAD3"; fire("UPDATE_BINDINGS")
+assertEq(#BLOCKED, 0, "hint update is combat-safe")
+COMBAT = false; KEYBINDS = {}; fire("UPDATE_BINDINGS")
+
 step("header menu")
 MENUS = {}
 TM.handle.__scripts.OnMouseUp(TM.handle, "RightButton")

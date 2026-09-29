@@ -809,6 +809,13 @@ local function BuildExtrasPage(page)
     Check(page, "Only show in Defensive Stance / Bear Form", 16, -326, "tankOnly")
     local tankNote = Label(page, "Paladins have no tank stance, so this does nothing for them.", 44, -348, "GameFontDisableSmall")
     tankNote:SetJustifyH("LEFT")
+
+    Label(page, "Controller & keybindings", 16, -374, "GameFontNormalLarge")
+    Check(page, "Show keybinding hints beside party bars", 16, -396, "keyHints")
+    local keyNote = Label(page,
+        "Set keys or controller buttons in Options > Keybindings > AddOns > TauntMaster Forever.",
+        44, -418, "GameFontDisableSmall")
+    keyNote:SetJustifyH("LEFT")
 end
 
 TM._spellRows = spellRows
@@ -839,7 +846,7 @@ local function ShowPage(name)
 end
 
 local function BuildWindow()
-    win = Window("TauntMasterForeverConfig", "TauntMaster Forever Options", 520, 500)
+    win = Window("TauntMasterForeverConfig", "TauntMaster Forever Options", 520, 560)
 
     local prev
     for _, t in ipairs(TAB_ORDER) do

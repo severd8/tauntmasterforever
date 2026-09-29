@@ -119,6 +119,7 @@ local DEFAULTS = {
     flashAggro = true,
     sortByRole = false,
     healthText = false,
+    keyHints = true,
     rangeFade = true,
     roleIcons = true,
     showToT = false,
@@ -281,6 +282,14 @@ function TM:CreateUnitButton(parent, unit)
     mana:SetTextColor(0.35, 0.65, 1)
     mana:Hide()
     btn.manaText = mana
+
+    -- Keybinding hint, just left of the bar (controller / keyboard users)
+    local hint = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    hint:SetPoint("RIGHT", btn, "LEFT", -4, 0)
+    hint:SetJustifyH("RIGHT")
+    hint:SetTextColor(1, 0.82, 0)
+    hint:Hide()
+    btn.keyHint = hint
 
     -- Aggro flash: a white overlay that pulses
     local flash = bar:CreateTexture(nil, "OVERLAY", nil, 7)
@@ -661,6 +670,8 @@ TM.ANNOUNCE_LABELS = { none = "Off", SAY = "Say", YELL = "Yell", PARTY = "Party"
 local CHAT_TYPES = { SAY = "SAY", YELL = "YELL", PARTY = "PARTY", RAID = "RAID",
     INSTANCE = "INSTANCE_CHAT", RAID_WARNING = "RAID_WARNING" }
 local BUTTON_SUFFIX = { LeftButton = "1", RightButton = "2", MiddleButton = "3" }
+-- Keybinding presses arrive as these made-up mouse buttons (see Bindings.xml)
+local KEYBIND_SUFFIX = { TMLeft = "1", TMRight = "2" }
 local ANNOUNCE_WINDOW = 1.5 -- seconds; covers the spell queue after a click
 local pendingAnnounce
 
@@ -677,9 +688,15 @@ end
 function TM:OnBarClick(mouseButton)
     pendingAnnounce = nil
     if not CHAT_TYPES[self.db.announceChannel] then return end
-    local suffix = BUTTON_SUFFIX[mouseButton]
-    if not suffix then return end
-    local bind = self:GetBindings()[ModifierPrefix() .. suffix]
+    local bind
+    if KEYBIND_SUFFIX[mouseButton] then
+        -- Keybindings always use the plain Left/Right Click spell, whatever modifier is held
+        bind = self:GetBindings()[KEYBIND_SUFFIX[mouseButton]]
+    else
+        local suffix = BUTTON_SUFFIX[mouseButton]
+        if not suffix then return end
+        bind = self:GetBindings()[ModifierPrefix() .. suffix]
+    end
     if bind and (bind.kind == "enemy" or bind.kind == "self") and bind.text ~= "" then
         pendingAnnounce = { spell = bind.text:lower(), time = GetTime() }
     end
@@ -754,6 +771,68 @@ function TM:ApplyBindingsToButton(btn, bindings)
             end
         end
     end
+
+    -- Keybindings click with the made-up buttons "TMLeft"/"TMRight". The "*" prefix
+    -- matches any modifier, so a controller button bound as e.g. SHIFT-PAD1 still
+    -- casts the plain Left/Right Click spell instead of the Shift-click one.
+    for suffix, key in pairs({ ["-tmleft"] = "1", ["-tmright"] = "2" }) do
+        local typeAttr, macroAttr = "*type" .. suffix, "*macrotext" .. suffix
+        btn:SetAttribute(typeAttr, nil)
+        btn:SetAttribute(macroAttr, nil)
+        local bind = bindings[key]
+        if bind and bind.kind ~= "none" then
+            if bind.kind == "assist" or bind.kind == "target" then
+                btn:SetAttribute(typeAttr, bind.kind)
+            elseif bind.text and bind.text ~= "" then
+                btn:SetAttribute(typeAttr, "macro")
+                btn:SetAttribute(macroAttr, self:BuildMacro(bind.kind, bind.text, btn.unit,
+                    btn.isToT and "target" or nil))
+            end
+        end
+    end
+end
+
+---------------------------------------------------------------------------
+-- Keybindings (Options > Keybindings > AddOns > TauntMaster Forever).
+-- Listed in Bindings.xml; each one presses a bar (or the hidden "targeted ally"
+-- button) with the Left or Right Click spell.
+---------------------------------------------------------------------------
+BINDING_HEADER_TAUNTMASTERFOREVER = "TauntMaster Forever"
+TM.KEYBIND_UNITS = {
+    { unit = "player", label = "You" },
+    { unit = "party1", label = "Party 1" },
+    { unit = "party2", label = "Party 2" },
+    { unit = "party3", label = "Party 3" },
+    { unit = "party4", label = "Party 4" },
+    { unit = "ally",   label = "Targeted ally" },
+}
+for _, u in ipairs(TM.KEYBIND_UNITS) do
+    _G["BINDING_NAME_CLICK TauntMasterForever_" .. u.unit .. ":TMLeft"] = u.label .. ": Left Click spell"
+    _G["BINDING_NAME_CLICK TauntMasterForever_" .. u.unit .. ":TMRight"] = u.label .. ": Right Click spell"
+end
+
+local function KeyText(command)
+    local key = GetBindingKey and GetBindingKey(command)
+    if not key then return nil end
+    local ok, text = pcall(GetBindingText, key, true)   -- short form, like action bar hotkeys
+    if not ok or type(text) ~= "string" or text == "" then text = key end
+    return text
+end
+
+-- Shows e.g. "PAD1 / PAD2" beside each party bar that has keybindings
+function TM:UpdateKeyHints()
+    if not self.partyButtons then return end
+    for _, btn in ipairs(self.partyButtons) do
+        local cmd = "CLICK TauntMasterForever_" .. btn.unit
+        local l, r = KeyText(cmd .. ":TMLeft"), KeyText(cmd .. ":TMRight")
+        local text = (l and r) and (l .. " / " .. r) or l or r
+        if self.db.keyHints and text then
+            btn.keyHint:SetText(text)
+            btn.keyHint:Show()
+        else
+            btn.keyHint:Hide()
+        end
+    end
 end
 
 function TM:ApplyBindings()
@@ -762,6 +841,7 @@ function TM:ApplyBindings()
         for _, btn in ipairs(self.buttons) do
             self:ApplyBindingsToButton(btn, bindings)
         end
+        if self.allyButton then self:ApplyBindingsToButton(self.allyButton, bindings) end
     end)
 end
 
@@ -980,6 +1060,7 @@ function TM:ApplyFonts()
         btn.nameText:SetFont(font, self.db.nameFontSize, flags)
         btn.statusText:SetFont(font, self.db.nameFontSize, flags)
         btn.manaText:SetFont(font, self.db.nameFontSize, flags)
+        btn.keyHint:SetFont(font, self.db.nameFontSize, flags)
         btn.bar:SetStatusBarTexture(tex)
         btn.roleIcon:SetSize(iconSize, iconSize)
     end
@@ -991,6 +1072,7 @@ end
 
 function TM:ApplySettings()
     self:ApplyFonts()
+    self:UpdateKeyHints()
     self:Layout()
     self:ApplyVisibility()
     self:ApplyBindings()
@@ -1069,6 +1151,15 @@ function TM:BuildFrames()
     totLabel:SetPoint("BOTTOMLEFT", tot, "TOPLEFT", 0, 1)
     totLabel:SetText("Target's target")
     self.totLabel = totLabel
+
+    -- Hidden button for the "Targeted ally" keybindings: taunts whatever is attacking
+    -- the friendly player you have targeted. Works in raids, where per-slot bindings don't.
+    local ally = CreateFrame("Button", "TauntMasterForever_ally", UIParent, "SecureActionButtonTemplate")
+    ally.unit = "target"
+    ally:SetAttribute("unit", "target")
+    ally:RegisterForClicks("AnyUp")
+    ally:HookScript("PreClick", function(_, mouseButton) TM:OnBarClick(mouseButton) end)
+    self.allyButton = ally
 
     self:BuildMinimapButton()
     self:BuildCooldownIcons()
@@ -1295,6 +1386,7 @@ events:RegisterEvent("UNIT_HEALTH")
 events:RegisterEvent("UNIT_MAXHEALTH")
 events:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 events:RegisterEvent("PLAYER_ROLES_ASSIGNED")
+events:RegisterEvent("UPDATE_BINDINGS")
 events:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON then
         TauntMasterForeverDB = TauntMasterForeverDB or {}
@@ -1320,6 +1412,8 @@ events:SetScript("OnEvent", function(_, event, arg1)
         end
     elseif not TM.built then
         return
+    elseif event == "UPDATE_BINDINGS" then
+        TM:UpdateKeyHints()
     elseif event == "SPELL_UPDATE_COOLDOWN" then
         TM:UpdateCooldowns()
     elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED" then

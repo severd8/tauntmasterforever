@@ -160,6 +160,9 @@ function IsShiftKeyDown() return MOD_KEYS.shift end
 function IsControlKeyDown() return MOD_KEYS.ctrl end
 function IsAltKeyDown() return MOD_KEYS.alt end
 CHAT = {}
+KEYBINDS = {}   -- command -> key, e.g. ["CLICK TauntMasterForever_party1:TMLeft"] = "PAD1"
+function GetBindingKey(cmd) return KEYBINDS[cmd] end
+function GetBindingText(key, short) return (short and key:gsub("^SHIFT%-", "s-")) or key end
 C_ChatInfo = { SendChatMessage = function(text, chat) CHAT[#CHAT + 1] = chat .. ":" .. text end }
 LE_PARTY_CATEGORY_INSTANCE = 2
 function PlaySound(k) log("SOUND", k) end

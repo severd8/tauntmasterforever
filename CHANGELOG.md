@@ -1,6 +1,6 @@
 ## 1.7.2
 
-- New: spell names on the Click Bindings tab are checked as you type. A green check means the spell was found, yellow means you haven't learned it yet, and red means no spell has that name. Hover the icon for details.
+- New: spell names on the Click Bindings tab are checked as you type. A green check means the spell was found, yellow means you haven't learned it yet, and red means no spell has that name. A message under the Save button explains the problem, and opening the tab lists any saved spells that need attention.
 - New: autocomplete. Start typing and a list of matching spells from your spellbook appears. Click one, or use the arrow keys and press Tab or Enter.
 - Spell names are saved with the game's exact spelling, so "growl" becomes "Growl". This also applies to "Custom spell..." in the General tab.
 

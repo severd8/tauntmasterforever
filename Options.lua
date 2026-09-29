@@ -509,6 +509,42 @@ local function UpdateRowStatus(row)
     end
 end
 
+-- Message line under the Save button: explains the spell box you're working in,
+-- or lists the boxes that need attention when the tab opens.
+local STATUS_MSG = {
+    ok = "|cff40ff40%s: %s. Spell found.|r",
+    unlearned = "|cffffcc00%s: %s. You haven't learned this spell yet.|r",
+    missing = "|cffff4040%s: %s. No spell with this name. Check the spelling.|r",
+}
+local bindingsMsg
+
+local function ShowRowMessage(row)
+    if not bindingsMsg then return end
+    local status = row.statusState
+    if status then
+        bindingsMsg:SetText(STATUS_MSG[status]:format(row.label, strtrim(row.edit:GetText() or "")))
+    else
+        bindingsMsg:SetText("")
+    end
+end
+
+local function ShowProblemSummary()
+    if not bindingsMsg then return end
+    local problems = {}
+    for _, row in ipairs(spellRows) do
+        if row.statusState == "missing" then
+            problems[#problems + 1] = row.label .. " (not found)"
+        elseif row.statusState == "unlearned" then
+            problems[#problems + 1] = row.label .. " (not learned)"
+        end
+    end
+    if #problems > 0 then
+        bindingsMsg:SetText("|cffffcc00Check these spells: " .. table.concat(problems, ", ") .. "|r")
+    else
+        bindingsMsg:SetText("")
+    end
+end
+
 -- Suggestion list: one shared dropdown that follows whichever spell box you're typing in
 local MAX_SUGGEST = 8
 local ROW_H = 20
@@ -536,6 +572,7 @@ local function AcceptSuggestion(spell)
     row.edit:SetCursorPosition(#spell.name)
     HideSuggest()
     UpdateRowStatus(row)
+    ShowRowMessage(row)
 end
 
 local function BuildSuggest(parent)
@@ -606,10 +643,14 @@ local function WireSpellBox(row)
     local eb = row.edit
     eb:HookScript("OnTextChanged", function(_, userInput)
         UpdateRowStatus(row)
-        if userInput then ShowSuggestions(row) end
+        if userInput then
+            ShowSuggestions(row)
+            ShowRowMessage(row)
+        end
     end)
     eb:HookScript("OnEditFocusGained", function()
         spellCache = CollectPlayerSpells()
+        ShowRowMessage(row)
     end)
     eb:HookScript("OnEditFocusLost", function()
         if SuggestOpenFor(row) and not suggest:IsMouseOver() then HideSuggest() end
@@ -651,6 +692,7 @@ local function RefreshSpellRows()
         UpdateRowStatus(row)
     end
     HideSuggest()
+    ShowProblemSummary()
 end
 
 local function SaveSpellRows()
@@ -684,7 +726,7 @@ local function BuildBindingsPage(page)
     local y = -52
     for _, mod in ipairs(TM.MODS) do
         for _, b in ipairs(TM.BUTTONS) do
-            local row = { key = mod .. b.id, kind = "none" }
+            local row = { key = mod .. b.id, kind = "none", label = TM.MOD_LABELS[mod] .. b.label }
             Label(page, TM.MOD_LABELS[mod] .. b.label, 16, y - 4)
             row.cycle = Cycle(page, 170, TM.KINDS, TM.KIND_LABELS,
                 function() return row.kind end,
@@ -730,6 +772,13 @@ local function BuildBindingsPage(page)
     check:SetPoint("LEFT", defaults, "RIGHT", 8, 0)
     check:SetText("Check spells")
     check:SetScript("OnClick", function() TM:CheckSpells() end)
+
+    bindingsMsg = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    bindingsMsg:SetPoint("TOPLEFT", save, "BOTTOMLEFT", 0, -8)
+    bindingsMsg:SetPoint("RIGHT", page, "RIGHT", -16, 0)
+    bindingsMsg:SetJustifyH("LEFT")
+    bindingsMsg:SetText("")
+    TM._bindingsMsg = bindingsMsg
 
     AddRefresher(RefreshSpellRows)
 end

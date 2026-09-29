@@ -90,6 +90,7 @@ Bound keys appear beside each party bar, so you always know which button saves w
 | `/tm lock` · `/tm unlock` | Lock or unlock the bars' position |
 | `/tm display` · `/tm advanced` · `/tm spells` · `/tm extras` | Open a specific options tab |
 | `/tm check` | Check that your bound spells exist and are learned |
+| `/tm news` | Show the welcome / what's new window |
 | `/tm reset` | Move the bars back to the middle of the screen |
 
 `/tauntmaster` works too.

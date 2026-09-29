@@ -7,8 +7,13 @@ local function load_file(path)
     local chunk = assert(loadstring(src, "@" .. path))
     chunk(ADDON, ns)
 end
-load_file(ADDON_DIR .. "/Core.lua")
-load_file(ADDON_DIR .. "/Options.lua")
+-- Load files in the same order as the .toc
+local tocFile = assert(io.open(ADDON_DIR .. "/TauntMasterForever.toc"))
+for line in tocFile:lines() do
+    local file = line:match("^([%w_/]+%.lua)%s*$")
+    if file then load_file(ADDON_DIR .. "/" .. file) end
+end
+tocFile:close()
 local TM = ns.TM
 
 local function fire(event, ...)
@@ -470,6 +475,39 @@ TauntMasterForeverDB = { announceText = "My own text", schema = 2 }
 fire("ADDON_LOADED", "TauntMasterForever")
 assertEq(TM.db.announceText, "My own text", "custom message kept")
 TauntMasterForeverDB = savedDB; TM.db = savedDB
+
+step("splash screen")
+local splash = TM._splash
+-- Fresh install: shown at login
+assert(splash and splash.__shown, "splash shown on first login")
+assertEq(TM.db.lastSeenVersion, TM:CurrentNewsVersion(), "version remembered")
+local txt = splash.text:GetText()
+assert(txt:find("Quick start") and txt:find("What's new") and txt:find("/tm news"), "splash has quick start and news")
+local newsLines = 0
+for _ in txt:gmatch("\n%- |cffffd100v") do newsLines = newsLines + 1 end
+assertEq(newsLines, 6, "six latest changes listed")
+splash:Hide()
+-- Same version next login: not shown
+TM:MaybeShowSplash(); assertEq(splash.__shown, false, "not shown again for the same version")
+-- New version: shown again
+TM.db.lastSeenVersion = "1.0.0"; TM:MaybeShowSplash()
+assertEq(splash.__shown, true, "shown after an update"); splash:Hide()
+-- Turned off: not shown after updates
+TM.db.lastSeenVersion = "1.0.0"; TM.db.showSplash = false; TM:MaybeShowSplash()
+assertEq(splash.__shown, false, "respects the checkbox")
+-- /tm news toggles it regardless
+SlashCmdList.TAUNTMASTERFOREVER("news"); assertEq(splash.__shown, true, "/tm news opens it")
+assertEq(splash.check:GetChecked(), false, "checkbox reflects setting")
+splash.check:SetChecked(true); splash.check.__scripts.OnClick(splash.check)
+assertEq(TM.db.showSplash, true, "checkbox turns it back on")
+SlashCmdList.TAUNTMASTERFOREVER("news"); assertEq(splash.__shown, false, "/tm news closes it")
+local esc = false
+for _, n in ipairs(UISpecialFrames) do if n == "TauntMasterForeverSplash" then esc = true end end
+assert(esc, "Escape closes the splash")
+-- News list stays in sync with the changelog
+local cf = assert(io.open(ADDON_DIR .. "/CHANGELOG.md")); local topVersion = cf:read("*a"):match("## ([%d%.]+)"); cf:close()
+assertEq(TM:CurrentNewsVersion(), topVersion, "News.lua top version matches CHANGELOG.md")
+for _, e in ipairs(TM.NEWS) do assert(e.version and e.date and #e.items > 0, "news entry complete") end
 
 step("header menu")
 MENUS = {}

@@ -107,6 +107,7 @@ local DEFAULTS = {
     unitsPerColumn = 5,
     maxColumns = 8,
     showSolo = true,
+    showSplash = true,
     showInRaid = true,
     showPlayer = true,
     minimap = true,
@@ -1388,6 +1389,7 @@ local function Help()
     print("  /tm lock | unlock — lock or unlock the bars' position")
     print("  /tm display | advanced | spells | extras — open that tab")
     print("  /tm check — verify your bound spells exist in Forever")
+    print("  /tm news — show the welcome / what's new window")
     print("  /tm reset — move the bars back to the default position")
 end
 
@@ -1408,6 +1410,8 @@ SlashCmdList.TAUNTMASTERFOREVER = function(msg)
         TM:SetLocked(msg == "lock")
     elseif msg == "spells" or msg == "display" or msg == "advanced" or msg == "extras" then
         TM:OpenConfig(msg)
+    elseif msg == "news" then
+        TM:ToggleSplash()
     elseif msg == "check" then
         TM:CheckSpells()
     elseif msg == "debug" then
@@ -1479,6 +1483,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "PLAYER_LOGIN" then
         TM:RunOutOfCombat(function() TM:BuildFrames() end)
         TM:PrintLoadMessage()
+        TM:MaybeShowSplash()
     elseif event == "PLAYER_REGEN_ENABLED" then
         TM:FlushPending()
         if TM.layoutPending then

@@ -10,6 +10,8 @@ A tanking addon for **World of Warcraft: Forever** (interface 16001, client 1.60
 
 - `TauntMasterForever.toc` — `## Version: @project-version@` is filled in by the packager from the git tag. Don't hard-code a version.
 - `Core.lua` — everything except the options window: bars, threat colors, click bindings (secure attributes), layout, visibility, low mana warning, cooldown icons, target's target, minimap button, header menu, slash commands, events.
+- `News.lua` — short "What's new" lines for the splash screen, newest first. **Add an entry with every release**; its top version must match the top of `CHANGELOG.md` (a test checks this).
+- `Splash.lua` — welcome / what's new window. Shows once per new `News.lua` version (and on first install) unless turned off; `/tm news` opens it. Logo is `Media/logo.tga` (128×128).
 - `Options.lua` — the single tabbed options window: General, Advanced, Click Bindings, Extras.
 - `Bindings.xml` — keybindings (loaded automatically by WoW, not listed in the `.toc`). Each is a `CLICK` binding on a bar (`TauntMasterForever_player`, `_party1`–`_party4`) or the hidden `TauntMasterForever_ally` button, using the made-up mouse buttons `TMLeft`/`TMRight`. Their secure attributes are `*type-tmleft` / `*macrotext-tmleft` etc.; the `*` matches any modifier so controller buttons with modifiers still use the plain Left/Right Click spell. Binding names are set in `Core.lua` (`BINDING_NAME_...`).
 - `tests/` — offline test suite (not shipped). `wowstub.lua` fakes the WoW API; `run_tests.lua` holds the scenarios; `run.lua` runs them.
@@ -44,7 +46,7 @@ Things only testable in game: real click-to-taunt in a group, Forever's exact se
 
 ## Releasing
 
-1. Make the change, run the tests, and add a new section at the top of `CHANGELOG.md` (e.g. `## 1.7.1`).
+1. Make the change, run the tests, add a new section at the top of `CHANGELOG.md` (e.g. `## 1.7.1`), and add the matching entry at the top of `News.lua`.
 2. Commit and push to `main`. The **Tests** workflow must be green.
 3. Tag and push the tag: `git tag v1.7.1 && git push origin v1.7.1`. Tags containing `beta` or `alpha` upload as Beta/Alpha files.
 4. The **Package and release** workflow runs the tests again, then uploads to CurseForge. Tyler checks the Actions tab for a green check and the CurseForge Files page (new files go through CurseForge review).

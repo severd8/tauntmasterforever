@@ -173,7 +173,8 @@ function UnregisterUnitWatch() end
 function RegisterStateDriver(f, k, v) f.__driver = v end
 function UnregisterStateDriver(f, k) f.__driver = nil end
 TICKERS = {}
-C_Timer = { NewTicker = function(_, fn) TICKERS[#TICKERS + 1] = fn end }
+C_Timer = { NewTicker = function(_, fn) TICKERS[#TICKERS + 1] = fn end, After = function(_, fn) fn() end }
+function CreateColor(r, g, b, a) return { r = r, g = g, b = b, a = a } end
 KNOWN = { Growl = { spellID = 6795, iconID = 1 }, ["Challenging Roar"] = { spellID = 5209, iconID = 2 },
     Taunt = { spellID = 355, iconID = 3 }, ["Bear Form"] = { spellID = 5487, iconID = 4 },
     ["Mark of the Wild"] = { spellID = 1126, iconID = 5 } }

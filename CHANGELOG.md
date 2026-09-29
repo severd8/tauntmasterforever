@@ -1,3 +1,7 @@
+## 1.10.0
+
+- New: welcome screen with quick-start tips and the latest changes. It shows once after each update (and on first install). Turn it off with the checkbox at the bottom, and reopen it anytime with /tm news.
+
 ## 1.9.1
 
 - Keybindings now have their own "TauntMaster Forever" section in Options > Keybindings, like other addons, instead of being listed under AddOns.

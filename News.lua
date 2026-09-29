@@ -6,6 +6,9 @@ local ADDON, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.11.1", date = "2026-09-29", items = {
+        "Aggro \"Volume slider\" renamed to \"Sound channel\" (Master, Sound Effects or Dialog).",
+    } },
     { version = "1.11.0", date = "2026-09-29", items = {
         "All settings are on one scrolling page, divided into sections.",
         "Aggro sound: choose the sound, when it plays, and which volume slider it follows.",

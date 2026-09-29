@@ -1,3 +1,7 @@
+## 1.11.1
+
+- Renamed the aggro "Volume slider" option to "Sound channel". It picks which of WoW's volume settings (Master, Sound Effects or Dialog) the alert follows.
+
 ## 1.11.0
 
 - All settings are now on one scrolling page, divided into sections: Taunt Spells, Layout, Appearance, Aggro Alerts, Reach, Taunt Cooldowns, Low Mana Warning, Announcements, Target's Target, Controller & Keybindings, Click Bindings and General.

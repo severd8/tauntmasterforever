@@ -21,7 +21,7 @@ It's a from-scratch rebuild of the classic *TauntMaster* addon, written for Fore
 - **Taunt picker** — choose from every taunt your class has, with icons. Spells you haven't learned yet are marked.
 - **Taunt cooldown icons** — see when your taunts are on cooldown, or when they're ready.
 - **Low mana warning** — shows next to your bar and your healers' bars when mana drops below the level you choose.
-- **Aggro alerts** — optional flashing bar and sound when someone else pulls a mob. Pick the sound, when it plays (close to pulling, has aggro, or firmly has aggro) and which volume slider it follows.
+- **Aggro alerts** — optional flashing bar and sound when someone else pulls a mob. Pick the sound, when it plays (close to pulling, has aggro, or firmly has aggro) and which sound channel it plays on (Master, Sound Effects or Dialog).
 - **Target's target bar** — see who your target is hitting, and click it to taunt your target.
 - **Raid support** — raid bars are grouped by raid group.
 - **Customizable** — health %, range fading, role icons, sort by role, bar textures, text sizes, class colors, and a "only show in Defensive Stance / Bear Form" mode.
@@ -67,7 +67,7 @@ All settings are on one scrolling page, in sections:
 | **Taunt Spells** | Left and Right Click spell pickers |
 | **Layout** | Bar size, units per column, max columns, spacing, scale, lock, include yourself, show in raids, hide when solo, tank-stance-only mode, sort by role, reset position |
 | **Appearance** | Class colors, role icons, health %, bar texture, text sizes |
-| **Aggro Alerts** | Flash bar, aggro sound, sound choice with a Test button, when it plays, volume slider |
+| **Aggro Alerts** | Flash bar, aggro sound, sound choice with a Test button, when it plays, sound channel |
 | **Reach** | Fade bars your taunt can't reach (red X = no enemy targeted) |
 | **Taunt Cooldowns** | Show on cooldown or when ready, icon size |
 | **Low Mana Warning** | On/off and the percentage it warns at |

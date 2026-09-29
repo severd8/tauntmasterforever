@@ -787,7 +787,7 @@ local SECTIONS = {
               function(v) TM.db.aggroSoundLevel = v end)
           lvl:SetPoint("TOPLEFT", cx, top - 26)
           AddRefresher(lvl.Refresh)
-          RowLabel(p, "Volume slider", R_X, top - 56)
+          RowLabel(p, "Sound channel", R_X, top - 56)
           local ch = Cycle(p, 120, TM.SOUND_CHANNEL_KEYS, TM.SOUND_CHANNEL_LABELS,
               function() return TM.db.aggroSoundChannel end,
               function(v) TM.db.aggroSoundChannel = v; TM:TestAggroSound() end)

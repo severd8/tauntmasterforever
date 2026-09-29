@@ -68,6 +68,18 @@ Taunts cast on "their target" go to the enemy the clicked player is fighting. Bl
 
 In a custom macro, `{unit}` is replaced with the clicked player (for example `/cast [@{unit}target] Growl`).
 
+### Controller and keybindings
+
+Prefer a controller, or keys instead of clicking? Go to **Options → Keybindings → AddOns → TauntMaster Forever** and bind any key or controller button:
+
+| Binding | Does |
+|---|---|
+| **You / Party 1–4: Left Click spell** | Casts your Left Click spell on that player's target |
+| **You / Party 1–4: Right Click spell** | Casts your Right Click spell for that player |
+| **Targeted ally: Left / Right Click spell** | Target a friendly player, then press it to taunt whatever is attacking them. Works in raids too. |
+
+Bound keys appear beside each party bar, so you always know which button saves whom. Turn the hints off on the **Extras** tab.
+
 ### Slash commands
 
 | Command | Does |

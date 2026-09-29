@@ -11,6 +11,7 @@ A tanking addon for **World of Warcraft: Forever** (interface 16001, client 1.60
 - `TauntMasterForever.toc` — `## Version: @project-version@` is filled in by the packager from the git tag. Don't hard-code a version.
 - `Core.lua` — everything except the options window: bars, threat colors, click bindings (secure attributes), layout, visibility, low mana warning, cooldown icons, target's target, minimap button, header menu, slash commands, events.
 - `Options.lua` — the single tabbed options window: General, Advanced, Click Bindings, Extras.
+- `Bindings.xml` — keybindings (loaded automatically by WoW, not listed in the `.toc`). Each is a `CLICK` binding on a bar (`TauntMasterForever_player`, `_party1`–`_party4`) or the hidden `TauntMasterForever_ally` button, using the made-up mouse buttons `TMLeft`/`TMRight`. Their secure attributes are `*type-tmleft` / `*macrotext-tmleft` etc.; the `*` matches any modifier so controller buttons with modifiers still use the plain Left/Right Click spell. Binding names are set in `Core.lua` (`BINDING_NAME_...`).
 - `tests/` — offline test suite (not shipped). `wowstub.lua` fakes the WoW API; `run_tests.lua` holds the scenarios; `run.lua` runs them.
 - `CHANGELOG.md` — release notes shown on CurseForge. Newest version at the top.
 - `.pkgmeta` — packager config (folder name, changelog, files to leave out of the download).

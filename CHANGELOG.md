@@ -1,3 +1,9 @@
+## 1.7.1
+
+- New: Icon Size slider for the taunt cooldown icons (General tab, under Taunt Cooldowns)
+- The target's-target bar moves up to make room for larger icons
+- README: added bug report and support links
+
 ## 1.7.0 — Initial release
 
 First public release of TauntMaster Forever for WoW: Forever.

@@ -127,6 +127,7 @@ local DEFAULTS = {
     manaWarnPct = 20,
     cdShowOnCooldown = true,
     cdShowWhenReady = false,
+    cdIconSize = 26,
     announceChannel = "none",
     announceText = "Taunted!",
     point = { "CENTER", "CENTER", -300, 0 },
@@ -588,7 +589,7 @@ function TM:BuildCooldownIcons()
     self.cdIcons = {}
     for i, key in ipairs({ "1", "2" }) do
         local b = CreateFrame("Frame", nil, self.main)
-        b:SetSize(26, 26)
+        b:SetSize(self.db.cdIconSize, self.db.cdIconSize)
         if i == 1 then
             b:SetPoint("BOTTOMLEFT", self.handle, "TOPLEFT", 0, 2)
         else
@@ -814,7 +815,7 @@ function TM:Layout()
         if tot then
             tot:SetSize(self.db.width, self.db.height)
             tot:ClearAllPoints()
-            tot:SetPoint("BOTTOMLEFT", self.handle, "TOPLEFT", 0, 44)
+            tot:SetPoint("BOTTOMLEFT", self.handle, "TOPLEFT", 0, self.db.cdIconSize + 18)
             if self.db.showToT then
                 RegisterUnitWatch(tot)
             else
@@ -921,6 +922,10 @@ function TM:ApplyFonts()
         btn.manaText:SetFont(font, self.db.nameFontSize, flags)
         btn.bar:SetStatusBarTexture(tex)
         btn.roleIcon:SetSize(iconSize, iconSize)
+    end
+    -- Taunt cooldown icons (not protected, so this is safe in combat)
+    if self.cdIcons then
+        for _, b in ipairs(self.cdIcons) do b:SetSize(self.db.cdIconSize, self.db.cdIconSize) end
     end
 end
 

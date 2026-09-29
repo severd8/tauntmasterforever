@@ -108,6 +108,7 @@ function Methods:GetWidth() return 140 end
 function Methods:GetCenter() return 0, 0 end
 function Methods:GetEffectiveScale() return 1 end
 function Methods:GetName() return self.__name end
+function Methods:SetSize(w, h) protectedCheck(self, "SetSize") self.__size = { w, h } end
 function Methods:SetValue(v) self.__value = v if self.__scripts.OnValueChanged then self.__scripts.OnValueChanged(self, issecretvalue(v) and 0 or v) end end
 function Methods:SetMinMaxValues(a, b) end
 function Methods:RegisterEvent(e) self.__events = self.__events or {} self.__events[e] = true end

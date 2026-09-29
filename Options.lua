@@ -337,6 +337,7 @@ local function BuildGeneralPage(page)
     end
     exclusive(onCd, "cdShowOnCooldown", ready, "cdShowWhenReady")
     exclusive(ready, "cdShowWhenReady", onCd, "cdShowOnCooldown")
+    Slider(page, "Icon Size", -302, "cdIconSize", 16, 64, nil, nil, RIGHT_COL + 110)
 end
 
 -- Advanced: display extras, text size, announce

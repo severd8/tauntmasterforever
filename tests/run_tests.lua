@@ -150,6 +150,23 @@ COMBAT = false; fire("PLAYER_REGEN_ENABLED")
 assertEq((pos("raid1")), 1 * (w + s), "raid1 moved to group 2 after combat")
 STATE.inRaid = false; RAID_GROUPS = {}
 
+step("cooldown icon size")
+TM.db.showToT = true
+TM.db.cdIconSize = 40
+TM:ApplySettings()
+assertEq(TM.cdIcons[1].__size[1], 40, "icon 1 resized")
+assertEq(TM.cdIcons[2].__size[2], 40, "icon 2 resized")
+assertEq(TM.totButton.__pos[2], 58, "target's-target bar moves above bigger icons")
+-- Resizing in combat: icons update right away, protected bar waits
+COMBAT = true; BLOCKED = {}
+TM.db.cdIconSize = 20
+TM:ApplyFonts(); TM:RequestLayout()
+assertEq(TM.cdIcons[1].__size[1], 20, "icons resize in combat")
+assertEq(#BLOCKED, 0, "nothing protected touched in combat")
+COMBAT = false; fire("PLAYER_REGEN_ENABLED")
+assertEq(TM.totButton.__pos[2], 38, "bar repositioned after combat")
+TM.db.cdIconSize = 26; TM.db.showToT = false; TM:ApplySettings()
+
 step("secret mode")
 SECRET_MODE = true
 runScenario("hidden values")

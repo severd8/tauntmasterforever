@@ -97,6 +97,10 @@ WoW: Forever runs on the modern addon system, which hides some combat informatio
 - **The bars disappeared** — you may have hidden them, or turned on **Hide When Solo** or tank-stance-only mode. Type `/tm show`.
 - **The bars are off-screen** — type `/tm reset`.
 
+## Feedback and bug reports
+
+Found a bug or have an idea? Please [submit it on GitHub](https://github.com/severd8/tauntmasterforever/issues/new/choose). A short form asks for your class, group type and any error message, so issues can be fixed quickly. You'll need a free GitHub account. Otherwise, feel free to leave a comment on the CurseForge page.
+
 ## Credits
 
 Special thanks to **Classic Mistake** in WoW Forever for their help with the initial testing.

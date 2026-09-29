@@ -1,3 +1,8 @@
+## 1.7.3
+
+- Taunt announcements now go out only when a taunt you clicked on a bar actually casts. Nothing is sent if the spell is on cooldown, out of range or fails, or when you taunt from your action bars.
+- Party, raid and instance announcements are skipped quietly when you're not in that kind of group, instead of showing an error.
+
 ## 1.7.2
 
 - New: spell names on the Click Bindings tab are checked as you type. A green check means the spell was found, yellow means you haven't learned it yet, and red means no spell has that name. A message under the Save button explains the problem, and opening the tab lists any saved spells that need attention.

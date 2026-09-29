@@ -299,6 +299,59 @@ macroRow.kind = "macro"; type_(macroRow, "/cast Gro")
 assertEq(macroRow.statusState, nil, "macros aren't validated")
 TM.db.bindings.DRUID = TM:DefaultBindings(); TM:ApplyBindings()
 
+step("taunt announcements")
+STATE.inGroup, STATE.inRaid, STATE.party = true, false, 2
+TM.db.announceChannel, TM.db.announceText = "PARTY", "Taunted!"
+TM:ApplyBindings()
+local bar = TM.unitToButton.party1
+assertEq(bar.__attrs.macrotext1, "/cast [@party1target,harm,nodead] Growl", "announce no longer in the click macro")
+local function click(b, mouse) b.__scripts.PreClick(b, mouse or "LeftButton") end
+local function cast(id) fire("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-guid", id) end
+-- Clicked taunt that casts: announced once
+CHAT = {}
+click(bar); cast(6795)
+assertEq(#CHAT, 1, "announce after a successful taunt"); assertEq(CHAT[1], "PARTY:Taunted!", "right channel and text")
+cast(6795)
+assertEq(#CHAT, 1, "only one message per click")
+-- Clicked but the spell never cast (cooldown, range): nothing
+CHAT = {}
+click(bar); FAKE_TIME = FAKE_TIME + 3; cast(6795)
+assertEq(#CHAT, 0, "no announce when the cast doesn't happen right away")
+-- A different spell cast after the click: nothing
+click(bar); cast(1126)
+assertEq(#CHAT, 0, "other spells aren't announced")
+-- Growl from the action bar, no bar click: nothing
+FAKE_TIME = FAKE_TIME + 3; cast(6795)
+assertEq(#CHAT, 0, "action-bar taunts aren't announced")
+-- Right click (Challenging Roar, AoE) announces too
+click(bar, "RightButton"); cast(5209)
+assertEq(#CHAT, 1, "AoE taunt announced")
+-- Middle click (target) sets nothing up
+CHAT = {}
+click(bar, "MiddleButton"); cast(6795)
+assertEq(#CHAT, 0, "non-spell clicks aren't announced")
+-- Modifier keys pick the right binding
+TM:GetBindings()["shift-1"] = { kind = "enemy", text = "Taunt" }
+MOD_KEYS.shift = true; click(bar); MOD_KEYS.shift = false
+cast(6795); assertEq(#CHAT, 0, "shift-click expects its own spell")
+FAKE_TIME = FAKE_TIME + 3
+MOD_KEYS.shift = true; click(bar); MOD_KEYS.shift = false
+cast(355); assertEq(#CHAT, 1, "shift-click spell announced")
+TM:GetBindings()["shift-1"] = nil
+-- Hidden spell ID: timing is trusted
+CHAT = {}
+SECRET_MODE = true; click(bar); fire("UNIT_SPELLCAST_SUCCEEDED", "player", "g", setmetatable({}, getmetatable(UnitHealth("player")))); SECRET_MODE = false
+assertEq(#CHAT, 1, "hidden spell ID still announces")
+-- Solo with Party chosen: skipped quietly
+CHAT = {}; STATE.inGroup = false
+click(bar); cast(6795)
+assertEq(#CHAT, 0, "no party message when solo")
+-- Off: nothing
+STATE.inGroup = true; TM.db.announceChannel = "none"
+click(bar); cast(6795)
+assertEq(#CHAT, 0, "announcements off")
+FAKE_TIME = FAKE_TIME + 3
+
 step("header menu")
 MENUS = {}
 TM.handle.__scripts.OnMouseUp(TM.handle, "RightButton")

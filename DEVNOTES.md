@@ -28,6 +28,7 @@ Forever runs the modern (Midnight 12.x-style) addon API, not the Classic one.
 - **Combat lockdown.** Protected (secure) frames can't be moved, resized, shown/hidden or have attributes changed in combat. Use `TM:RunOutOfCombat(fn)` or `TM:RequestLayout()`. The header (`TM.handle`) and main frame count as protected because secure bars are anchored to them.
 - **No automation.** Every taunt must come from the player's click. Never auto-taunt or auto-target.
 - **Missing APIs seen on Forever:** `Slider:SetObeyStepsOnDrag` doesn't exist (guard with `if s.SetObeyStepsOnDrag`). Guard any newer API the same way.
+- Taunt announcements are sent from Lua, not the click macro: a bar's `PreClick` hook records the clicked binding's spell (`TM:OnBarClick`), and `UNIT_SPELLCAST_SUCCEEDED` for the player sends the message if that spell succeeds within 1.5 seconds (`TM:OnSpellCastSucceeded`). Uses `C_ChatInfo.SendChatMessage` (falls back to `SendChatMessage`) inside `pcall`.
 - Tank stance conditions: Warrior Defensive Stance = `[stance:2]`, Druid Bear Form = `[form:1]` (confirmed by Tyler). Paladins have no stance; their taunt is Judgement with Seal of Fury.
 
 ## Testing

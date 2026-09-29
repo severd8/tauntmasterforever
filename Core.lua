@@ -299,6 +299,7 @@ function TM:CreateUnitButton(parent, unit)
     btn:SetScript("OnEnter", Button_OnEnter)
     btn:SetScript("OnLeave", Button_OnLeave)
     btn:HookScript("OnShow", function(b) TM:UpdateButton(b) end)
+    btn:HookScript("PreClick", function(_, mouseButton) TM:OnBarClick(mouseButton) end)
 
     RegisterUnitWatch(btn)
 
@@ -647,25 +648,84 @@ end
 ---------------------------------------------------------------------------
 -- Click bindings -> secure attributes
 ---------------------------------------------------------------------------
-local ANNOUNCE_CMDS = { SAY = "/s", YELL = "/y", PARTY = "/p", RAID = "/raid", INSTANCE = "/i", RAID_WARNING = "/rw" }
 TM.ANNOUNCE_CHANNELS = { "none", "SAY", "YELL", "PARTY", "RAID", "INSTANCE", "RAID_WARNING" }
 TM.ANNOUNCE_LABELS = { none = "Off", SAY = "Say", YELL = "Yell", PARTY = "Party", RAID = "Raid", INSTANCE = "Instance", RAID_WARNING = "Raid Warning" }
 
-function TM:AnnounceLine()
-    local cmd = ANNOUNCE_CMDS[self.db.announceChannel]
+---------------------------------------------------------------------------
+-- Taunt announcements: sent only after a taunt you clicked on a bar actually
+-- casts. A click records which spell it should cast; if the game reports that
+-- spell succeeding within a moment, the message goes out. On cooldown, out of
+-- range, wrong form or no target = no cast = no message. Taunts cast from your
+-- action bars aren't announced.
+---------------------------------------------------------------------------
+local CHAT_TYPES = { SAY = "SAY", YELL = "YELL", PARTY = "PARTY", RAID = "RAID",
+    INSTANCE = "INSTANCE_CHAT", RAID_WARNING = "RAID_WARNING" }
+local BUTTON_SUFFIX = { LeftButton = "1", RightButton = "2", MiddleButton = "3" }
+local ANNOUNCE_WINDOW = 1.5 -- seconds; covers the spell queue after a click
+local pendingAnnounce
+
+local function ModifierPrefix()
+    if SecureButton_GetModifierPrefix then return SecureButton_GetModifierPrefix() end
+    local p = ""
+    if IsAltKeyDown() then p = p .. "alt-" end
+    if IsControlKeyDown() then p = p .. "ctrl-" end
+    if IsShiftKeyDown() then p = p .. "shift-" end
+    return p
+end
+
+-- Called just before a bar's click runs its spell
+function TM:OnBarClick(mouseButton)
+    pendingAnnounce = nil
+    if not CHAT_TYPES[self.db.announceChannel] then return end
+    local suffix = BUTTON_SUFFIX[mouseButton]
+    if not suffix then return end
+    local bind = self:GetBindings()[ModifierPrefix() .. suffix]
+    if bind and (bind.kind == "enemy" or bind.kind == "self") and bind.text ~= "" then
+        pendingAnnounce = { spell = bind.text:lower(), time = GetTime() }
+    end
+end
+
+-- Called when one of your spells finishes casting successfully
+function TM:OnSpellCastSucceeded(spellID)
+    local p = pendingAnnounce
+    if not p then return end
+    if GetTime() - p.time > ANNOUNCE_WINDOW then
+        pendingAnnounce = nil
+        return
+    end
+    -- Make sure it's the clicked spell. If the game hides the spell from addons,
+    -- trust the timing instead.
+    if not IsSecret(spellID) and spellID then
+        local info = C_Spell and C_Spell.GetSpellInfo(spellID)
+        local name = info and info.name
+        if not IsSecret(name) then
+            if not name or name:lower() ~= p.spell then return end
+        end
+    end
+    pendingAnnounce = nil
+    self:SendAnnounce()
+end
+
+function TM:SendAnnounce()
+    local chat = CHAT_TYPES[self.db.announceChannel]
     local text = self.db.announceText
-    if not cmd or not text or text == "" then return "" end
-    return "\n" .. cmd .. " " .. text
+    if not chat or not text or text == "" then return end
+    -- Skip channels you can't talk in right now instead of showing an error
+    if chat == "PARTY" and not IsInGroup() then return end
+    if (chat == "RAID" or chat == "RAID_WARNING") and not IsInRaid() then return end
+    if chat == "INSTANCE_CHAT" and not IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then return end
+    local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+    if send then pcall(send, text, chat) end
 end
 
 function TM:BuildMacro(kind, text, unit, enemyUnit)
     enemyUnit = enemyUnit or (unit .. "target")
     if kind == "enemy" then
-        return "/cast [@" .. enemyUnit .. ",harm,nodead] " .. text .. self:AnnounceLine()
+        return "/cast [@" .. enemyUnit .. ",harm,nodead] " .. text
     elseif kind == "friend" then
         return "/cast [@" .. unit .. ",help,nodead] " .. text
     elseif kind == "self" then
-        return "/cast " .. text .. self:AnnounceLine()
+        return "/cast " .. text
     elseif kind == "macro" then
         local m = text:gsub("{unit}", unit)
         m = m:gsub("\\n", "\n")
@@ -1218,6 +1278,13 @@ end
 ---------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------
+-- Your own successful spell casts, for taunt announcements
+local castEvents = CreateFrame("Frame")
+castEvents:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
+castEvents:SetScript("OnEvent", function(_, _, _, _, spellID)
+    if TM.db then TM:OnSpellCastSucceeded(spellID) end
+end)
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")

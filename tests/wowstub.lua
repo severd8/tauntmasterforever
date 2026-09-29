@@ -112,6 +112,7 @@ function Methods:SetSize(w, h) protectedCheck(self, "SetSize") self.__size = { w
 function Methods:SetValue(v) self.__value = v if self.__scripts.OnValueChanged then self.__scripts.OnValueChanged(self, issecretvalue(v) and 0 or v) end end
 function Methods:SetMinMaxValues(a, b) end
 function Methods:RegisterEvent(e) self.__events = self.__events or {} self.__events[e] = true end
+function Methods:RegisterUnitEvent(e) self.__events = self.__events or {} self.__events[e] = true end
 function Methods:SetAlpha(a) self.__alpha = a end
 function Methods:GetFontString() return nil end
 function Methods:SetEnabled(v) self.__enabled = v end
@@ -152,7 +153,15 @@ function IsInRaid() return STATE.inRaid end
 function GetNumGroupMembers() return STATE.inRaid and 10 or (STATE.party + 1) end
 function GetNumSubgroupMembers() return STATE.party end
 function InCombatLockdown() return COMBAT end
-function GetTime() return os.clock() * 1000 end
+FAKE_TIME = 100
+function GetTime() return FAKE_TIME end
+MOD_KEYS = {}
+function IsShiftKeyDown() return MOD_KEYS.shift end
+function IsControlKeyDown() return MOD_KEYS.ctrl end
+function IsAltKeyDown() return MOD_KEYS.alt end
+CHAT = {}
+C_ChatInfo = { SendChatMessage = function(text, chat) CHAT[#CHAT + 1] = chat .. ":" .. text end }
+LE_PARTY_CATEGORY_INSTANCE = 2
 function PlaySound(k) log("SOUND", k) end
 SOUNDKIT = { RAID_WARNING = 8959 }
 RAID_CLASS_COLORS = { DRUID = { r = 1, g = 0.49, b = 0.04 }, PRIEST = { r = 1, g = 1, b = 1 } }
@@ -168,6 +177,10 @@ KNOWN = { Growl = { spellID = 6795, iconID = 1 }, ["Challenging Roar"] = { spell
 for n, info in pairs(KNOWN) do info.name = n end
 -- Like the real game: spell lookup by name ignores capitalization
 local function lookup(n)
+    if type(n) == "number" then   -- the real API takes spell IDs too
+        for _, info in pairs(KNOWN) do if info.spellID == n then return info end end
+        return nil
+    end
     if type(n) ~= "string" then return nil end
     for name, info in pairs(KNOWN) do if name:lower() == n:lower() then return info end end
     return nil

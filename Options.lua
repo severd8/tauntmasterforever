@@ -462,8 +462,8 @@ local function BuildAdvancedPage(page)
     AddRefresher(function() msg:SetText(TM.db.announceText or "") end)
 
     local note = Label(page,
-        "Announce is added to taunts cast on a target and to AoE taunts.\n" ..
-        "Say and Yell only work inside instances when sent from a click.",
+        "Announces only when a taunt you clicked on a bar actually casts, so nothing is\n" ..
+        "sent if it's on cooldown or out of range. Say and Yell only work inside instances.",
         16, -302, "GameFontDisableSmall")
     note:SetJustifyH("LEFT")
 end

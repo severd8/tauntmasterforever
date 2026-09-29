@@ -1,4 +1,4 @@
--- Test scenarios for TauntMaster Forever. Run via tests/run.lua (see CLAUDE.md).
+-- Test scenarios for TauntMaster Forever. Run via tests/run.lua (see DEVNOTES.md).
 -- Drives TauntMaster Forever through its features. Any Lua error aborts with a traceback.
 local ADDON = "TauntMasterForever"
 local ns = {}

@@ -10,4 +10,4 @@ manual-changelog:
 ignore:
   - .github
   - tests
-  - CLAUDE.md
+  - DEVNOTES.md

@@ -1,4 +1,4 @@
-# TauntMaster Forever — project notes
+# TauntMaster Forever — developer notes
 
 A tanking addon for **World of Warcraft: Forever** (interface 16001, client 1.60.x). One bar per party/raid member, colored by threat; clicking a bar casts the bound taunt on that member's target. A from-scratch rebuild of the old TauntMaster addon.
 

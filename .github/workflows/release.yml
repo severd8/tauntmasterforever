@@ -28,3 +28,7 @@ jobs:
           fetch-depth: 0   # full history, so the packager can find tags and build a changelog
 
       - uses: BigWigsMods/packager@v2
+        with:
+          # File name stays the default (TauntMasterForever-v1.7.0-forever.zip);
+          # the name shown on CurseForge becomes e.g. "tauntmaster-v1.7.0-forever".
+          args: -n ":tauntmaster-{project-version}{classic}{nolib}"

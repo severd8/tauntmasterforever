@@ -103,7 +103,7 @@ Found a bug or have an idea? Please [submit it on GitHub](https://github.com/sev
 
 ## Support the addon
 
-TauntMaster Forever is free. If it has saved your group a wipe, you can [leave a small tip on PayPal](https://www.paypal.com/donate/?business=HN2BMEG53YUJW&no_recurring=0&currency_code=USD). Thank you!
+TauntMaster Forever is free. If it has saved your group a wipe, you can [leave a small tip on Ko-fi](https://ko-fi.com/tauntmasterforever). Thank you!
 
 ## Credits
 

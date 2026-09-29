@@ -228,6 +228,64 @@ StaticPopupDialogs.TAUNTMASTERFOREVER_CUSTOM.OnAccept(popup, "1")
 assertEq(TM:GetBindings()["1"].text, "Taunt", "custom spell trimmed and saved")
 TM.db.bindings.DRUID = TM:DefaultBindings(); TM:ApplyBindings()
 
+step("click bindings: validation and autocomplete")
+TM:OpenConfig("spells")
+local rows = TM._spellRows
+local left = rows[1]                      -- Left click, bound to Growl (enemy)
+local function type_(row, text) row.edit:SetText(text); row.edit.__scripts.OnTextChanged(row.edit, true) end
+left.edit.__scripts.OnEditFocusGained(left.edit)   -- focusing a box loads your spellbook
+-- Existing binding shows a green check
+TM:OpenConfig("spells"); TauntMasterForeverConfig.__scripts.OnShow(TauntMasterForeverConfig)
+assertEq(left.statusState, "ok", "Growl validates")
+-- Typing a partial name suggests matches, prefix matches first
+type_(left, "c")
+local sug = TM._suggest()
+assert(sug and sug.__shown, "suggestions shown")
+assertEq(sug.matches[1].name, "Challenging Roar", "prefix match first")
+type_(left, "gr")
+assertEq(sug.matches[1].name, "Growl", "Growl suggested for 'gr'")
+assertEq(left.statusState, "missing", "partial name is not a spell")
+-- Tab accepts the highlighted suggestion
+left.edit.__scripts.OnTabPressed(left.edit)
+assertEq(left.edit:GetText(), "Growl", "Tab fills in the suggestion")
+assertEq(left.statusState, "ok", "accepted suggestion validates")
+assertEq(sug.__shown, false, "list closes after accepting")
+-- Arrow keys move the selection; Enter accepts it
+type_(left, "o")                         -- contains: Growl, Bear Form, Mark of the Wild ...
+local n = #sug.matches
+left.edit.__scripts.OnArrowPressed(left.edit, "DOWN")
+assertEq(sug.selected, math.min(2, n), "down arrow moves selection")
+local pick = sug.matches[sug.selected].name
+left.edit.__scripts.OnEnterPressed(left.edit)
+assertEq(left.edit:GetText(), pick, "Enter accepts the selected suggestion")
+-- Clicking a suggestion works too
+type_(left, "mark")
+sug.buttons[1].__scripts.OnClick(sug.buttons[1])
+assertEq(left.edit:GetText(), "Mark of the Wild", "click accepts suggestion")
+-- Escape closes the list without clearing the text
+type_(left, "gro")
+left.edit.__scripts.OnEscapePressed(left.edit)
+assertEq(sug.__shown, false, "Escape closes the list")
+assertEq(left.edit:GetText(), "gro", "Escape keeps what you typed")
+-- Status icons: not learned, and misspelled
+type_(left, "Taunt")
+assertEq(left.statusState, "unlearned", "Taunt exists but isn't learned by a Druid")
+type_(left, "Growll")
+assertEq(left.statusState, "missing", "misspelling flagged")
+-- Saving fixes capitalization
+type_(left, "growl")
+assertEq(left.statusState, "ok", "lowercase name still validates")
+for _, f in ipairs(ALL_FRAMES) do
+    if f.__kind == "Button" and f.__text == "Save" and f.__scripts.OnClick then f.__scripts.OnClick(f) end
+end
+assertEq(TM:GetBindings()["1"].text, "Growl", "saved with the game's spelling")
+-- Macro rows get no status icon or suggestions
+local macroRow = rows[2]
+macroRow.cycle.__scripts.OnClick(macroRow.cycle)  -- cycle kind forward
+macroRow.kind = "macro"; type_(macroRow, "/cast Gro")
+assertEq(macroRow.statusState, nil, "macros aren't validated")
+TM.db.bindings.DRUID = TM:DefaultBindings(); TM:ApplyBindings()
+
 step("header menu")
 MENUS = {}
 TM.handle.__scripts.OnMouseUp(TM.handle, "RightButton")

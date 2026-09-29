@@ -195,6 +195,88 @@ local function SpellLabel(s)
     return label
 end
 
+---------------------------------------------------------------------------
+-- Spell name validation and autocomplete
+---------------------------------------------------------------------------
+local SPELL_KINDS = { enemy = true, friend = true, self = true }
+
+-- Returns "ok", "unlearned" or "missing" (nil if the box is empty), plus the
+-- game's exact spelling of the name when it was found.
+local function ValidateSpell(text)
+    text = strtrim(text or "")
+    if text == "" then return nil end
+    local info = C_Spell and C_Spell.GetSpellInfo(text)
+    if not info then return "missing" end
+    if SpellKnown(info.spellID) == false then return "unlearned", info.name end
+    return "ok", info.name
+end
+
+-- Every castable spell in your spellbook, plus your class's taunts (even if not
+-- learned yet), used for suggestions. Rebuilt whenever a spell box gains focus.
+local spellCache = {}
+local function CollectPlayerSpells()
+    local list, seen = {}, {}
+    local function add(name, icon)
+        if type(name) == "string" and name ~= "" and not seen[name] then
+            seen[name] = true
+            list[#list + 1] = { name = name, icon = icon }
+        end
+    end
+    for _, s in ipairs(TM:GetClassSpells()) do
+        local info = C_Spell and C_Spell.GetSpellInfo(s.name)
+        add(info and info.name or s.name, info and info.iconID)
+    end
+    pcall(function()
+        if C_SpellBook and C_SpellBook.GetNumSpellBookSkillLines then
+            local bank = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player or 0
+            local flyout = Enum and Enum.SpellBookItemType and Enum.SpellBookItemType.Flyout
+            for i = 1, C_SpellBook.GetNumSpellBookSkillLines() do
+                local line = C_SpellBook.GetSpellBookSkillLineInfo(i)
+                if line then
+                    for j = line.itemIndexOffset + 1, line.itemIndexOffset + line.numSpellBookItems do
+                        local item = C_SpellBook.GetSpellBookItemInfo(j, bank)
+                        if item and not item.isPassive and (not flyout or item.itemType ~= flyout) then
+                            add(item.name, item.iconID)
+                        end
+                    end
+                end
+            end
+        elseif GetNumSpellTabs then
+            for t = 1, GetNumSpellTabs() do
+                local _, _, offset, num = GetSpellTabInfo(t)
+                for i = offset + 1, offset + num do
+                    if not (IsPassiveSpell and IsPassiveSpell(i, "spell")) then
+                        add(GetSpellBookItemName(i, "spell"), GetSpellBookItemTexture(i, "spell"))
+                    end
+                end
+            end
+        end
+    end)
+    return list
+end
+
+-- Names starting with what you typed come first, then names containing it.
+local function FindMatches(text, max)
+    text = strtrim(text or ""):lower()
+    if text == "" then return {} end
+    local starts, contains = {}, {}
+    for _, s in ipairs(spellCache) do
+        local n = s.name:lower()
+        if n:sub(1, #text) == text then
+            starts[#starts + 1] = s
+        elseif n:find(text, 1, true) then
+            contains[#contains + 1] = s
+        end
+    end
+    local byName = function(a, b) return a.name < b.name end
+    table.sort(starts, byName)
+    table.sort(contains, byName)
+    local out = {}
+    for _, s in ipairs(starts) do if #out < max then out[#out + 1] = s end end
+    for _, s in ipairs(contains) do if #out < max then out[#out + 1] = s end end
+    return out
+end
+
 local function BindingText(key)
     local b = TM:GetBindings()[key]
     if not b or b.kind == "none" then return "None" end
@@ -217,7 +299,8 @@ StaticPopupDialogs["TAUNTMASTERFOREVER_CUSTOM"] = {
         local eb = (self.GetEditBox and self:GetEditBox()) or self.editBox or self.EditBox
         local text = eb and strtrim(eb:GetText() or "")
         if text and text ~= "" then
-            TM:SetBinding(data or self.data, "enemy", text)
+            local _, exact = ValidateSpell(text)
+            TM:SetBinding(data or self.data, "enemy", exact or text)
             RunRefreshers()
         end
     end,
@@ -386,6 +469,175 @@ local function BuildAdvancedPage(page)
 end
 
 -- Click Bindings: every mouse button + modifier
+local STATUS_TEX = {
+    ok = "Interface\\RaidFrame\\ReadyCheck-Ready",
+    unlearned = "Interface\\RaidFrame\\ReadyCheck-Waiting",
+    missing = "Interface\\RaidFrame\\ReadyCheck-NotReady",
+}
+local STATUS_TIP = {
+    ok = "Spell found.",
+    unlearned = "This spell exists, but you haven't learned it yet.",
+    missing = "No spell with this name. Check the spelling.",
+}
+
+local function StatusIcon(parent)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(16, 16)
+    f.tex = f:CreateTexture(nil, "ARTWORK")
+    f.tex:SetAllPoints()
+    f:SetScript("OnEnter", function(self)
+        if not self.tip then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(self.tip, 1, 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    f:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f:Hide()
+    return f
+end
+
+local function UpdateRowStatus(row)
+    local status
+    if SPELL_KINDS[row.kind] then status = ValidateSpell(row.edit:GetText()) end
+    row.statusState = status
+    if status then
+        row.status.tex:SetTexture(STATUS_TEX[status])
+        row.status.tip = STATUS_TIP[status]
+        row.status:Show()
+    else
+        row.status:Hide()
+    end
+end
+
+-- Suggestion list: one shared dropdown that follows whichever spell box you're typing in
+local MAX_SUGGEST = 8
+local ROW_H = 20
+local suggest
+
+local function HideSuggest()
+    if suggest then
+        suggest:Hide()
+        suggest.row = nil
+    end
+end
+
+local function SuggestOpenFor(row)
+    return suggest and suggest:IsShown() and suggest.row == row
+end
+
+local function HighlightSuggestion()
+    for i, b in ipairs(suggest.buttons) do b.sel:SetShown(i == suggest.selected) end
+end
+
+local function AcceptSuggestion(spell)
+    local row = suggest and suggest.row
+    if not (row and spell) then return end
+    row.edit:SetText(spell.name)
+    row.edit:SetCursorPosition(#spell.name)
+    HideSuggest()
+    UpdateRowStatus(row)
+end
+
+local function BuildSuggest(parent)
+    suggest = CreateFrame("Frame", nil, parent)
+    suggest:SetFrameStrata("FULLSCREEN_DIALOG")
+    suggest:SetSize(224, ROW_H)
+    local border = suggest:CreateTexture(nil, "BACKGROUND", nil, -8)
+    border:SetAllPoints()
+    border:SetColorTexture(0.45, 0.45, 0.45, 1)
+    local bg = suggest:CreateTexture(nil, "BACKGROUND", nil, -7)
+    bg:SetPoint("TOPLEFT", 1, -1)
+    bg:SetPoint("BOTTOMRIGHT", -1, 1)
+    bg:SetColorTexture(0.07, 0.07, 0.07, 0.98)
+    suggest.buttons = {}
+    for i = 1, MAX_SUGGEST do
+        local b = CreateFrame("Button", nil, suggest)
+        b:SetSize(220, ROW_H)
+        b:SetPoint("TOPLEFT", 2, -2 - (i - 1) * ROW_H)
+        b.sel = b:CreateTexture(nil, "BACKGROUND")
+        b.sel:SetAllPoints()
+        b.sel:SetColorTexture(1, 0.82, 0, 0.18)
+        b.sel:Hide()
+        b:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+        b.icon = b:CreateTexture(nil, "ARTWORK")
+        b.icon:SetSize(16, 16)
+        b.icon:SetPoint("LEFT", 2, 0)
+        b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        b.text:SetPoint("LEFT", b.icon, "RIGHT", 4, 0)
+        b.text:SetPoint("RIGHT", -2, 0)
+        b.text:SetJustifyH("LEFT")
+        b:SetScript("OnClick", function(self) AcceptSuggestion(self.spell) end)
+        suggest.buttons[i] = b
+    end
+    suggest:Hide()
+end
+
+local function ShowSuggestions(row)
+    if not SPELL_KINDS[row.kind] then HideSuggest() return end
+    local text = row.edit:GetText() or ""
+    local matches = FindMatches(text, MAX_SUGGEST)
+    if #matches == 0 or (#matches == 1 and matches[1].name:lower() == strtrim(text):lower()) then
+        HideSuggest()
+        return
+    end
+    if not suggest then BuildSuggest(row.page) end
+    suggest.row, suggest.matches, suggest.selected = row, matches, 1
+    suggest:ClearAllPoints()
+    suggest:SetPoint("TOPLEFT", row.edit, "BOTTOMLEFT", -6, -2)
+    for i, b in ipairs(suggest.buttons) do
+        local s = matches[i]
+        if s then
+            b.spell = s
+            b.icon:SetTexture(s.icon)
+            b.text:SetText(s.name)
+            b:Show()
+        else
+            b.spell = nil
+            b:Hide()
+        end
+    end
+    suggest:SetHeight(#matches * ROW_H + 4)
+    HighlightSuggestion()
+    suggest:Show()
+end
+
+-- Wires a Click Bindings spell box: live status icon + suggestions + keyboard control
+local function WireSpellBox(row)
+    local eb = row.edit
+    eb:HookScript("OnTextChanged", function(_, userInput)
+        UpdateRowStatus(row)
+        if userInput then ShowSuggestions(row) end
+    end)
+    eb:HookScript("OnEditFocusGained", function()
+        spellCache = CollectPlayerSpells()
+    end)
+    eb:HookScript("OnEditFocusLost", function()
+        if SuggestOpenFor(row) and not suggest:IsMouseOver() then HideSuggest() end
+    end)
+    eb:SetScript("OnTabPressed", function()
+        if SuggestOpenFor(row) then AcceptSuggestion(suggest.matches[suggest.selected]) end
+    end)
+    eb:SetScript("OnEnterPressed", function(self)
+        if SuggestOpenFor(row) then
+            AcceptSuggestion(suggest.matches[suggest.selected])
+        else
+            self:ClearFocus()
+        end
+    end)
+    eb:SetScript("OnEscapePressed", function(self)
+        if SuggestOpenFor(row) then HideSuggest() else self:ClearFocus() end
+    end)
+    eb:SetScript("OnArrowPressed", function(_, key)
+        if not SuggestOpenFor(row) then return end
+        if key == "DOWN" then
+            suggest.selected = math.min(#suggest.matches, suggest.selected + 1)
+        elseif key == "UP" then
+            suggest.selected = math.max(1, suggest.selected - 1)
+        end
+        HighlightSuggestion()
+    end)
+end
+
 local function RefreshSpellRows()
     local bindings = TM:GetBindings()
     for _, row in ipairs(spellRows) do
@@ -396,7 +648,9 @@ local function RefreshSpellRows()
         local needsText = not (row.kind == "none" or row.kind == "assist" or row.kind == "target")
         row.edit:SetEnabled(needsText)
         row.edit:SetAlpha(needsText and 1 or 0.4)
+        UpdateRowStatus(row)
     end
+    HideSuggest()
 end
 
 local function SaveSpellRows()
@@ -405,7 +659,13 @@ local function SaveSpellRows()
         if row.kind == "none" then
             bindings[row.key] = nil
         else
-            bindings[row.key] = { kind = row.kind, text = row.edit:GetText() or "" }
+            local text = strtrim(row.edit:GetText() or "")
+            if SPELL_KINDS[row.kind] then
+                -- Save the game's exact spelling ("growl" becomes "Growl")
+                local _, exact = ValidateSpell(text)
+                text = exact or text
+            end
+            bindings[row.key] = { kind = row.kind, text = text }
         end
     end
     TM:ApplyBindings()
@@ -433,10 +693,16 @@ local function BuildBindingsPage(page)
                     local needsText = not (v == "none" or v == "assist" or v == "target")
                     row.edit:SetEnabled(needsText)
                     row.edit:SetAlpha(needsText and 1 or 0.4)
+                    UpdateRowStatus(row)
+                    HideSuggest()
                 end)
             row.cycle:SetPoint("TOPLEFT", 110, y)
-            row.edit = EditBox(page, 200)
+            row.page = page
+            row.edit = EditBox(page, 184)
             row.edit:SetPoint("TOPLEFT", 294, y - 1)
+            row.status = StatusIcon(page)
+            row.status:SetPoint("LEFT", row.edit, "RIGHT", 6, 0)
+            WireSpellBox(row)
             table.insert(spellRows, row)
             y = y - 25
         end
@@ -495,6 +761,9 @@ local function BuildExtrasPage(page)
     local tankNote = Label(page, "Paladins have no tank stance, so this does nothing for them.", 44, -348, "GameFontDisableSmall")
     tankNote:SetJustifyH("LEFT")
 end
+
+TM._spellRows = spellRows
+TM._suggest = function() return suggest end
 
 local TAB_ORDER = {
     { key = "general",  label = "General",        build = BuildGeneralPage },

@@ -163,16 +163,31 @@ function UnregisterStateDriver(f, k) f.__driver = nil end
 TICKERS = {}
 C_Timer = { NewTicker = function(_, fn) TICKERS[#TICKERS + 1] = fn end }
 KNOWN = { Growl = { spellID = 6795, iconID = 1 }, ["Challenging Roar"] = { spellID = 5209, iconID = 2 },
-    Taunt = { spellID = 355, iconID = 3 } }
+    Taunt = { spellID = 355, iconID = 3 }, ["Bear Form"] = { spellID = 5487, iconID = 4 },
+    ["Mark of the Wild"] = { spellID = 1126, iconID = 5 } }
+for n, info in pairs(KNOWN) do info.name = n end
+-- Like the real game: spell lookup by name ignores capitalization
+local function lookup(n)
+    if type(n) ~= "string" then return nil end
+    for name, info in pairs(KNOWN) do if name:lower() == n:lower() then return info end end
+    return nil
+end
+-- Spellbook: Druid has learned everything above except Taunt (a Warrior spell)
+SPELLBOOK = { "Growl", "Challenging Roar", "Bear Form", "Mark of the Wild" }
+C_SpellBook = {
+    GetNumSpellBookSkillLines = function() return 1 end,
+    GetSpellBookSkillLineInfo = function(i) return { itemIndexOffset = 0, numSpellBookItems = #SPELLBOOK } end,
+    GetSpellBookItemInfo = function(j) local n = SPELLBOOK[j] return { name = n, iconID = KNOWN[n].iconID, isPassive = false } end,
+}
 C_Spell = {
-    GetSpellInfo = function(n) return KNOWN[n] end,
+    GetSpellInfo = function(n) return lookup(n) end,
     GetSpellCooldown = function(id) return { startTime = maybeSecret(100), duration = maybeSecret(10) } end,
     IsSpellInRange = function(n, u) return maybeSecret(true) end,
 }
-function IsPlayerSpell(id) return true end
+function IsPlayerSpell(id) return id ~= 355 end   -- Druid hasn't learned Taunt
 C_CurveUtil = { CreateCurve = function() return newObj("Curve") end }
 CurveConstants = { ScaleTo100 = newObj("Curve") }
-Enum = { LuaCurveType = { Step = 1 } }
+Enum = { LuaCurveType = { Step = 1 }, SpellBookSpellBank = { Player = 0 } }
 C_AddOns = { GetAddOnMetadata = function() return "test" end }
 function GetCursorPosition() return 10, 10 end
 UISpecialFrames = {}

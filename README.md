@@ -101,6 +101,10 @@ WoW: Forever runs on the modern addon system, which hides some combat informatio
 
 Found a bug or have an idea? Please [submit it on GitHub](https://github.com/severd8/tauntmasterforever/issues/new/choose). A short form asks for your class, group type and any error message, so issues can be fixed quickly. You'll need a free GitHub account. Otherwise, feel free to leave a comment on the CurseForge page.
 
+## Support the addon
+
+TauntMaster Forever is free. If it has saved your group a wipe, you can [leave a small tip on PayPal](https://www.paypal.com/donate/?business=HN2BMEG53YUJW&no_recurring=0&currency_code=USD). Thank you!
+
 ## Credits
 
 Special thanks to **Classic Mistake** in WoW Forever for their help with the initial testing.

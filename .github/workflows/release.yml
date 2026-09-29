@@ -1,0 +1,24 @@
+# Builds the addon and uploads it to CurseForge whenever a version tag (like v1.7.1) is pushed.
+# Needs one repository secret: CF_API_KEY (your CurseForge API token).
+name: Package and release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # lets the packager also create a GitHub release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history, so the packager can find tags and build a changelog
+
+      - uses: BigWigsMods/packager@v2

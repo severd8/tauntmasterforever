@@ -500,9 +500,10 @@ TM.db.lastSeenVersion = "1.0.0"; TM.db.showSplash = false; TM:MaybeShowSplash()
 assertEq(splash.__shown, false, "respects the checkbox")
 -- /tm news toggles it regardless
 SlashCmdList.TAUNTMASTERFOREVER("news"); assertEq(splash.__shown, true, "/tm news opens it")
-assertEq(splash.check:GetChecked(), false, "checkbox reflects setting")
-splash.check:SetChecked(true); splash.check.__scripts.OnClick(splash.check)
-assertEq(TM.db.showSplash, true, "checkbox turns it back on")
+assertEq(splash.check:IsOn(), false, "switch reflects setting")
+splash.check.__scripts.OnClick(splash.check)
+assertEq(TM.db.showSplash, true, "switch turns it back on")
+assertEq(splash.check:IsOn(), true, "switch repaints")
 SlashCmdList.TAUNTMASTERFOREVER("news"); assertEq(splash.__shown, false, "/tm news closes it")
 local esc = false
 for _, n in ipairs(UISpecialFrames) do if n == "TauntMasterForeverSplash" then esc = true end end
@@ -617,6 +618,26 @@ STATE.roles.party2 = "TANK"; threatTo(0); n = #LOG; threatTo(3)
 assertEq(#soundsSince(n), 0, "other tanks don't trigger it")
 STATE.roles.party2 = "DAMAGER"; STATE.threat.party2 = 0; tick()
 TM.db.aggroSound = false; TM.db.aggroSoundKey = "raidwarning"; TM.db.aggroSoundChannel = "Master"
+
+step("name and look consistency")
+-- Every user-facing name is "TauntMaster Forever"
+assertEq(TM.handle.text:GetText(), "TauntMaster Forever", "bar header name")
+local chatLine
+for _, l in ipairs(LOG) do if l:find("TauntMaster") then chatLine = l end end
+assert(chatLine and chatLine:find("TauntMaster Forever"), "chat uses full name: " .. tostring(chatLine))
+for _, l in ipairs(LOG) do
+    assert(not l:find("TauntMaster|r"), "old short chat prefix: " .. l)
+end
+for _, file in ipairs({ "Core.lua", "Options.lua", "Splash.lua", "Theme.lua", "News.lua", "README.md", "TauntMasterForever.toc", "Bindings.xml" }) do
+    local f = assert(io.open(ADDON_DIR .. "/" .. file)); local src = f:read("*a"); f:close()
+    assert(not src:find("Taunt Master"), "'Taunt Master' (with a space) in " .. file)
+    assert(not src:find("Spell_Nature_Reincarnation"), "old icon in " .. file)
+    assert(not src:find("UIPanelButtonTemplate") and not src:find("UICheckButtonTemplate")
+        and not src:find("UIPanelScrollFrameTemplate") and not src:find("BasicFrameTemplate"),
+        "Blizzard-style widget left in " .. file)
+end
+local tf = assert(io.open(ADDON_DIR .. "/TauntMasterForever.toc")); local toc = tf:read("*a"); tf:close()
+assert(toc:find("IconTexture: Interface\\AddOns\\TauntMasterForever\\Media\\logo"), "AddOns list icon is the logo")
 
 step("header menu")
 MENUS = {}

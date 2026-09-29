@@ -3,7 +3,7 @@
 ## Notes: Click a party/raid member's bar to taunt their target off them. Bars change color with aggro.
 ## Author: Tyler
 ## Version: @project-version@
-## IconTexture: Interface\Icons\Spell_Nature_Reincarnation
+## IconTexture: Interface\AddOns\TauntMasterForever\Media\logo
 ## SavedVariables: TauntMasterForeverDB
 ## X-License: MIT
 ## X-Curse-Project-ID: 1717418
@@ -11,5 +11,6 @@
 
 Core.lua
 News.lua
+Theme.lua
 Options.lua
 Splash.lua

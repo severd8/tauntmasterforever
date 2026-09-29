@@ -8,7 +8,6 @@ local TM = ns.TM
 local WIDTH, HEIGHT = 720, 620
 local BANNER_H = 130
 local MAX_NEWS = 6
-local LOGO = "Interface\\AddOns\\TauntMasterForever\\Media\\logo"
 
 local splash
 
@@ -54,6 +53,8 @@ local function BuildText()
 end
 
 local function Build()
+    local T = ns.Theme
+    local C = T.C
     splash = CreateFrame("Frame", "TauntMasterForeverSplash", UIParent)
     splash:SetSize(WIDTH, HEIGHT)
     splash:SetPoint("CENTER", 0, 40)
@@ -67,90 +68,102 @@ local function Build()
     splash:SetScript("OnDragStop", splash.StopMovingOrSizing)
     splash:Hide()
     table.insert(UISpecialFrames, "TauntMasterForeverSplash") -- Escape closes it
-
-    -- Gold border + dark body
-    local border = splash:CreateTexture(nil, "BACKGROUND", nil, -8)
-    border:SetAllPoints()
-    border:SetColorTexture(0.42, 0.35, 0.23, 1)
-    local body = splash:CreateTexture(nil, "BACKGROUND", nil, -7)
-    body:SetPoint("TOPLEFT", 2, -2)
-    body:SetPoint("BOTTOMRIGHT", -2, 2)
-    body:SetColorTexture(0.05, 0.04, 0.035, 0.97)
+    T.Fill(splash, C.win)
+    T.Border(splash, C.edge)
 
     -- Banner
     local banner = splash:CreateTexture(nil, "BORDER")
-    banner:SetPoint("TOPLEFT", 2, -2)
-    banner:SetPoint("TOPRIGHT", -2, -2)
+    banner:SetPoint("TOPLEFT", 1, -1)
+    banner:SetPoint("TOPRIGHT", -1, -1)
     banner:SetHeight(BANNER_H)
-    banner:SetColorTexture(1, 1, 1, 1)
-    local ok = CreateColor and pcall(banner.SetGradient, banner, "HORIZONTAL",
-        CreateColor(0.55, 0.11, 0.07, 1), CreateColor(0.10, 0.02, 0.02, 1))
-    if not ok then banner:SetColorTexture(0.35, 0.07, 0.05, 1) end
+    T.HeaderGradient(banner)
     local line = splash:CreateTexture(nil, "ARTWORK")
     line:SetPoint("TOPLEFT", banner, "BOTTOMLEFT")
     line:SetPoint("TOPRIGHT", banner, "BOTTOMRIGHT")
-    line:SetHeight(2)
-    line:SetColorTexture(0.42, 0.35, 0.23, 1)
+    line:SetHeight(1)
+    line:SetColorTexture(unpack(C.edge))
 
     local logo = splash:CreateTexture(nil, "ARTWORK")
     logo:SetSize(108, 108)
-    logo:SetPoint("TOPLEFT", 18, -13)
-    logo:SetTexture(LOGO)
+    logo:SetPoint("TOPLEFT", 18, -12)
+    logo:SetTexture(T.LOGO)
 
-    local title = splash:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-    title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 18, -14)
-    local font, _, flags = title:GetFont()
-    title:SetFont(font, 34, "THICKOUTLINE")
-    title:SetTextColor(0.95, 0.9, 0.77)
-    title:SetText("TauntMaster Forever")
-
-    local sub = splash:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local title = T.Text(splash, T.NAME, "GameFontNormalHuge", { 0.95, 0.9, 0.78 }, 34)
+    title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 18, -16)
+    local sub = T.Text(splash, "One-click tanking for WoW: Forever", "GameFontNormalLarge", C.orange)
     sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 2, -8)
-    sub:SetTextColor(1, 0.7, 0.28)
-    sub:SetText("One-click tanking for WoW: Forever")
 
-    local close = CreateFrame("Button", nil, splash, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -2, -2)
+    local x = T.FlatButton(splash, "X", 24, 24)
+    x:SetPoint("TOPRIGHT", -12, -12)
+    x:SetScript("OnClick", function() splash:Hide() end)
 
-    -- Scrolling text
-    local scroll = CreateFrame("ScrollFrame", "TauntMasterForeverSplashScroll", splash, "UIPanelScrollFrameTemplate")
+    -- Text area: mouse wheel scrolls it, with a thin themed scroll bar
+    local scroll = CreateFrame("ScrollFrame", nil, splash)
     scroll:SetPoint("TOPLEFT", 22, -(BANNER_H + 16))
-    scroll:SetPoint("BOTTOMRIGHT", -32, 48)
+    scroll:SetPoint("BOTTOMRIGHT", -26, 50)
     local content = CreateFrame("Frame", nil, scroll)
     content:SetSize(WIDTH - 60, 10)
     scroll:SetScrollChild(content)
-    local text = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    local text = T.Text(content, "", "GameFontHighlight")
     text:SetPoint("TOPLEFT")
     text:SetWidth(WIDTH - 60)
-    text:SetJustifyH("LEFT")
     text:SetSpacing(3)
-    splash.text, splash.content = text, content
+    splash.text, splash.content, splash.scroll = text, content, scroll
+
+    local bar = CreateFrame("Frame", nil, splash)
+    bar:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 8, 0)
+    bar:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 8, 0)
+    bar:SetWidth(4)
+    T.Fill(bar, C.offTrack)
+    local thumb = bar:CreateTexture(nil, "ARTWORK")
+    thumb:SetWidth(4)
+    thumb:SetColorTexture(unpack(C.btnEdge))
+    splash.scrollBar = bar
+
+    local function updateBar()
+        local range = scroll:GetVerticalScrollRange() or 0
+        local h = scroll:GetHeight() or 1
+        if range <= 0 then bar:Hide() return end
+        bar:Show()
+        local total = h + range
+        local thumbH = math.max(20, h * h / total)
+        thumb:SetHeight(thumbH)
+        thumb:ClearAllPoints()
+        local off = (scroll:GetVerticalScroll() or 0) / range * (h - thumbH)
+        thumb:SetPoint("TOP", bar, "TOP", 0, -off)
+    end
+    scroll:EnableMouseWheel(true)
+    scroll:SetScript("OnMouseWheel", function(self, delta)
+        local range = self:GetVerticalScrollRange() or 0
+        local v = (self:GetVerticalScroll() or 0) - delta * 40
+        self:SetVerticalScroll(math.max(0, math.min(range, v)))
+        updateBar()
+    end)
+    splash.updateBar = updateBar
 
     -- Footer
     local sep = splash:CreateTexture(nil, "ARTWORK")
-    sep:SetPoint("BOTTOMLEFT", 2, 40)
-    sep:SetPoint("BOTTOMRIGHT", -2, 40)
+    sep:SetPoint("BOTTOMLEFT", 1, 40)
+    sep:SetPoint("BOTTOMRIGHT", -1, 40)
     sep:SetHeight(1)
-    sep:SetColorTexture(0.29, 0.25, 0.16, 1)
+    sep:SetColorTexture(unpack(C.line))
 
-    local cb = CreateFrame("CheckButton", nil, splash, "UICheckButtonTemplate")
-    cb:SetSize(24, 24)
-    cb:SetPoint("BOTTOMLEFT", 14, 9)
-    local cbText = splash:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    cbText:SetPoint("LEFT", cb, "RIGHT", 2, 0)
-    cbText:SetText("Show this after each update")
-    cb:SetScript("OnClick", function(self) TM.db.showSplash = self:GetChecked() and true or false end)
-    splash.check = cb
+    local sw = T.SwitchWidget(splash)
+    sw:SetPoint("BOTTOMLEFT", 16, 13)
+    local swText = T.Text(splash, "Show welcome screen after updates", "GameFontHighlightSmall", C.muted)
+    swText:SetPoint("LEFT", sw, "RIGHT", 8, 0)
+    sw:SetScript("OnClick", function(self)
+        TM.db.showSplash = not TM.db.showSplash
+        self:SetOn(TM.db.showSplash)
+    end)
+    splash.check = sw
 
-    local done = CreateFrame("Button", nil, splash, "UIPanelButtonTemplate")
-    done:SetSize(100, 22)
+    local done = T.FlatButton(splash, "Close", 90)
     done:SetPoint("BOTTOMRIGHT", -14, 10)
-    done:SetText("Close")
     done:SetScript("OnClick", function() splash:Hide() end)
 
-    local notes = splash:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local notes = T.Text(splash, "Full release notes on CurseForge", "GameFontNormalSmall", C.orange)
     notes:SetPoint("RIGHT", done, "LEFT", -12, 0)
-    notes:SetText("Full release notes on CurseForge")
 
     TM._splash = splash
 end
@@ -159,7 +172,9 @@ function TM:ShowSplash()
     if not splash then Build() end
     splash.text:SetText(BuildText())
     splash.content:SetHeight((splash.text:GetStringHeight() or 0) + 10)
-    splash.check:SetChecked(self.db.showSplash)
+    splash.scroll:SetVerticalScroll(0)
+    splash.updateBar()
+    splash.check:SetOn(self.db.showSplash)
     self.db.lastSeenVersion = self:CurrentNewsVersion()
     splash:Show()
     splash:Raise()

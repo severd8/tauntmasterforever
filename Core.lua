@@ -8,7 +8,7 @@ local TM = {}
 ns.TM = TM
 _G.TauntMasterForever = TM
 
-local PREFIX = "|cffff6600TauntMaster|r: "
+local PREFIX = "|cffe8a040TauntMaster Forever|r: "
 local function Print(msg) print(PREFIX .. msg) end
 TM.Print = Print
 
@@ -1104,14 +1104,17 @@ function TM:ApplyVisibility()
 end
 
 -- Header stays visible when locked so its right-click menu is always reachable.
+-- Unlocked: red with gold text (drag to move). Locked: dark with muted text.
 function TM:UpdateHeader()
     if not self.handle then return end
+    local C = ns.Theme.C
+    self.handle.text:SetText(ns.Theme.NAME)
     if self.db.locked then
-        self.handle.text:SetText("TauntMaster")
-        self.handle.bg:SetColorTexture(0.15, 0.15, 0.15, 0.85)
+        self.handle.bg:SetColorTexture(unpack(C.side))
+        self.handle.text:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
     else
-        self.handle.text:SetText("TauntMaster (drag)")
-        self.handle.bg:SetColorTexture(0.6, 0.25, 0, 0.85)
+        self.handle.bg:SetColorTexture(unpack(C.red))
+        self.handle.text:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
     end
 end
 
@@ -1127,7 +1130,7 @@ function TM:ShowHeaderMenu(owner)
         return
     end
     MenuUtil.CreateContextMenu(owner, function(_, root)
-        root:CreateTitle("TauntMaster")
+        root:CreateTitle("TauntMaster Forever")
         root:CreateCheckbox("Lock",
             function() return TM.db.locked end,
             function() TM:SetLocked(not TM.db.locked) end)
@@ -1200,8 +1203,11 @@ function TM:BuildFrames()
     handle:RegisterForDrag("LeftButton")
     handle.bg = handle:CreateTexture(nil, "BACKGROUND")
     handle.bg:SetAllPoints()
+    ns.Theme.Border(handle, ns.Theme.C.edge)
     handle.text = handle:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    handle.text:SetPoint("CENTER")
+    handle.text:SetPoint("LEFT", 4, 0)
+    handle.text:SetPoint("RIGHT", -4, 0)
+    handle.text:SetWordWrap(false)
     handle:SetScript("OnDragStart", function()
         if TM.db.locked or InCombatLockdown() then return end
         main:StartMoving()
@@ -1215,7 +1221,7 @@ function TM:BuildFrames()
     end)
     handle:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("TauntMaster")
+        GameTooltip:AddLine("TauntMaster Forever")
         if not TM.db.locked then GameTooltip:AddLine("Drag to move", 1, 1, 1) end
         GameTooltip:AddLine("Right-click for options", 1, 1, 1)
         GameTooltip:Show()
@@ -1289,7 +1295,8 @@ function TM:BuildMinimapButton()
 
     local icon = b:CreateTexture(nil, "BACKGROUND")
     icon:SetSize(20, 20)
-    icon:SetTexture("Interface\\Icons\\Spell_Nature_Reincarnation")
+    icon:SetTexture(ns.Theme.LOGO)
+    icon:SetTexCoord(0.06, 0.94, 0.06, 0.94)
     icon:SetPoint("TOPLEFT", 7, -5)
 
     local border = b:CreateTexture(nil, "OVERLAY")
@@ -1402,7 +1409,7 @@ function TM:PrintLoadMessage()
             end
         end
     end
-    local msg = "|cffff6600TauntMaster Forever|r loaded."
+    local msg = "|cffe8a040TauntMaster Forever|r loaded."
     if #parts > 0 then
         msg = msg .. " " .. table.concat(parts, ", ") .. "."
     else

@@ -1,3 +1,14 @@
+## 1.12.1
+
+- Fixed: bars could stop updating inside instances when range fading was on.
+- Fixed: Say and Yell announcements outside instances caused an "Interface action failed" error. They're now skipped there (WoW only allows them inside instances).
+- Fixed: taunts you haven't learned yet showed as "not found" instead of "not learned".
+- Fixed: the "Targeted ally" keybindings now work the same way as the bar keybindings.
+- Fixed: the announcement message is saved as you type, so closing the window mid-edit keeps it.
+- Fixed: dragging the header during combat could trigger a blocked-action warning.
+- Fixed: the low mana warning now counts you as a healer when you're the only one.
+- /tm reset during combat now says the bars will move when combat ends.
+
 ## 1.12.0
 
 - Redesigned options window: a custom look with tabs down the left side (Taunts, Click Bindings, Layout, Appearance, Alerts, General), grouped cards, on/off switches, dropdown menus and cleaner sliders.

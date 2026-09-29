@@ -2,7 +2,7 @@
 -- Shows once after each update (and on first install), unless turned off.
 -- /tm news opens it anytime.
 
-local ADDON, ns = ...
+local _, ns = ...
 local TM = ns.TM
 
 local WIDTH, HEIGHT = 720, 620

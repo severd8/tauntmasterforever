@@ -181,11 +181,15 @@ KNOWN = { Growl = { spellID = 6795, iconID = 1 }, ["Challenging Roar"] = { spell
     Taunt = { spellID = 355, iconID = 3 }, ["Bear Form"] = { spellID = 5487, iconID = 4 },
     ["Mark of the Wild"] = { spellID = 1126, iconID = 5 } }
 for n, info in pairs(KNOWN) do info.name = n end
+-- Spells not in your spellbook: the real game only finds these by ID, not by name
+BY_ID_ONLY = { [694] = { spellID = 694, iconID = 6, name = "Mocking Blow" } }
+INSTANCE = false
+function IsInInstance() return INSTANCE end
 -- Like the real game: spell lookup by name ignores capitalization
 local function lookup(n)
     if type(n) == "number" then   -- the real API takes spell IDs too
         for _, info in pairs(KNOWN) do if info.spellID == n then return info end end
-        return nil
+        return BY_ID_ONLY[n]
     end
     if type(n) ~= "string" then return nil end
     for name, info in pairs(KNOWN) do if name:lower() == n:lower() then return info end end

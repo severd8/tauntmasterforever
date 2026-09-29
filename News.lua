@@ -2,10 +2,13 @@
 -- Add an entry here with every release, matching the top version in CHANGELOG.md
 -- (a test fails if they don't match).
 
-local ADDON, ns = ...
+local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.12.1", date = "2026-09-29", items = {
+        "Bug fixes: range fading in instances, Say/Yell announcements, unlearned taunts, Targeted ally keybindings.",
+    } },
     { version = "1.12.0", date = "2026-09-29", items = {
         "Redesigned options window with tabs, switches and dropdown menus.",
         "Aggro \"Volume slider\" is now \"Sound channel\" (Master, Sound Effects or Dialog).",

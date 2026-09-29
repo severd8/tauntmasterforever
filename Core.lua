@@ -66,22 +66,40 @@ TM.COMMON_DEFAULTS = {
 -- kind: enemy = cast on the member's target, self = no target, friend = cast on the member.
 TM.CLASS_SPELLS = {
     WARRIOR = {
-        { name = "Taunt", kind = "enemy" },
-        { name = "Mocking Blow", kind = "enemy" },
-        { name = "Challenging Shout", kind = "self", note = "AoE" },
+        { name = "Taunt", id = 355, kind = "enemy" },
+        { name = "Mocking Blow", id = 694, kind = "enemy" },
+        { name = "Challenging Shout", id = 1161, kind = "self", note = "AoE" },
     },
     DRUID = {
-        { name = "Growl", kind = "enemy", note = "Bear Form" },
-        { name = "Challenging Roar", kind = "self", note = "Bear Form, AoE" },
+        { name = "Growl", id = 6795, kind = "enemy", note = "Bear Form" },
+        { name = "Challenging Roar", id = 5209, kind = "self", note = "Bear Form, AoE" },
     },
     PALADIN = {
-        { name = "Judgement", kind = "enemy", note = "needs Seal of Fury" },
-        { name = "Blessing of Protection", kind = "friend", utility = true },
+        { name = "Judgement", id = 20271, kind = "enemy", note = "needs Seal of Fury" },
+        { name = "Blessing of Protection", id = 1022, kind = "friend", utility = true },
     },
 }
 
 function TM:GetClassSpells()
     return self.CLASS_SPELLS[self:PlayerClass()] or {}
+end
+
+-- Spell info by name. The game only finds spells by name once they're in your
+-- spellbook, so the class taunts are also looked up by ID (not learned yet).
+function TM:GetSpellInfo(name)
+    if type(name) ~= "string" or name == "" or not (C_Spell and C_Spell.GetSpellInfo) then return nil end
+    local info = C_Spell.GetSpellInfo(name)
+    if info then return info end
+    local lower = name:lower()
+    for _, spells in pairs(self.CLASS_SPELLS) do
+        for _, s in ipairs(spells) do
+            if s.id and s.name:lower() == lower then
+                info = C_Spell.GetSpellInfo(s.id)
+                if info and type(info.name) == "string" and info.name:lower() == lower then return info end
+            end
+        end
+    end
+    return nil
 end
 
 function TM:SetBinding(key, kind, text)
@@ -396,19 +414,22 @@ end
 -- player's own distance from you and never shows the marker.
 local DIM = 0.35
 
-local function BoolAlpha(b, whenTrue, whenFalse)
+-- The result may itself be hidden, so callers pass a fallback here instead of
+-- using "or" on it (testing a hidden value is an error).
+local function BoolAlpha(b, whenTrue, whenFalse, fallback)
     if IsSecret(b) then
         if C_CurveUtil and C_CurveUtil.EvaluateColorValueFromBoolean then
             local ok, a = pcall(C_CurveUtil.EvaluateColorValueFromBoolean, b, whenTrue, whenFalse)
             if ok then return a end
         end
-        return nil
+        return fallback
     end
-    return b and whenTrue or whenFalse
+    if b then return whenTrue end
+    return whenFalse
 end
 
 local function IsKnownSpell(name)
-    local info = C_Spell and C_Spell.GetSpellInfo(name)
+    local info = TM:GetSpellInfo(name)
     if not info then return false end
     if IsPlayerSpell then return IsPlayerSpell(info.spellID) end
     if C_SpellBook and C_SpellBook.IsSpellInSpellBook then return C_SpellBook.IsSpellInSpellBook(info.spellID) end
@@ -421,7 +442,7 @@ function TM:RangeState(btn)
     if not IsSecret(isMe) and isMe then return 1, 0 end
 
     local bind = self:GetBindings()["1"]
-    if bind and bind.kind == "enemy" and bind.text ~= "" and C_Spell and C_Spell.IsSpellInRange
+    if bind and bind.kind == "enemy" and bind.text and bind.text ~= "" and C_Spell and C_Spell.IsSpellInRange
         and IsKnownSpell(bind.text) then
         local target = btn.isToT and "target" or (unit .. "target")
         local r = C_Spell.IsSpellInRange(bind.text, target)
@@ -429,9 +450,9 @@ function TM:RangeState(btn)
             local marker = 0
             if not btn.isToT then
                 -- Whether their target is an enemy decides the marker
-                marker = BoolAlpha(UnitCanAttack("player", target), 0, 1) or 0
+                marker = BoolAlpha(UnitCanAttack("player", target), 0, 1, 0)
             end
-            return BoolAlpha(r, 1, DIM) or 1, marker
+            return BoolAlpha(r, 1, DIM, 1), marker
         end
         if r == nil then
             -- The taunt can't be cast on their target at all: no target, friendly, or dead
@@ -443,7 +464,7 @@ function TM:RangeState(btn)
     -- Fallback: the player's own distance from you
     local inRange, checked = UnitInRange(unit)
     if not IsSecret(checked) and not checked then return 1, 0 end
-    return BoolAlpha(inRange, 1, DIM) or 1, 0
+    return BoolAlpha(inRange, 1, DIM, 1), 0
 end
 
 function TM:UpdateButton(btn)
@@ -620,7 +641,7 @@ function TM:UpdateManaWarning()
     local hide = self.db.hideManaWarning
     local threshold = self.db.manaWarnPct
 
-    local anyHealer = false
+    local anyHealer = IsHealer("player")
     for _, u in ipairs(GroupUnits()) do
         if IsHealer(u) then anyHealer = true break end
     end
@@ -831,6 +852,8 @@ function TM:SendAnnounce(target, player)
     if chat == "PARTY" and not IsInGroup() then return end
     if (chat == "RAID" or chat == "RAID_WARNING") and not IsInRaid() then return end
     if chat == "INSTANCE_CHAT" and not IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then return end
+    -- Outside instances the game blocks addon Say/Yell that isn't a direct key press
+    if (chat == "SAY" or chat == "YELL") and not (IsInInstance and IsInInstance()) then return end
     local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
     if send then pcall(send, text, chat) end
 end
@@ -1210,9 +1233,12 @@ function TM:BuildFrames()
     handle.text:SetWordWrap(false)
     handle:SetScript("OnDragStart", function()
         if TM.db.locked or InCombatLockdown() then return end
+        main.isMoving = true
         main:StartMoving()
     end)
     handle:SetScript("OnDragStop", function()
+        if not main.isMoving then return end
+        main.isMoving = false
         main:StopMovingOrSizing()
         TM:SavePosition()
     end)
@@ -1259,7 +1285,7 @@ function TM:BuildFrames()
 
     -- Hidden button for the "Targeted ally" keybindings: taunts whatever is attacking
     -- the friendly player you have targeted. Works in raids, where per-slot bindings don't.
-    local ally = CreateFrame("Button", "TauntMasterForever_ally", UIParent, "SecureActionButtonTemplate")
+    local ally = CreateFrame("Button", "TauntMasterForever_ally", UIParent, "SecureUnitButtonTemplate")
     ally.unit = "target"
     ally:SetAttribute("unit", "target")
     ally:RegisterForClicks("AnyUp")
@@ -1375,7 +1401,7 @@ function TM:CheckSpells()
             if bind and (bind.kind == "enemy" or bind.kind == "friend" or bind.kind == "self") and bind.text ~= "" then
                 any = true
                 local label = self.MOD_LABELS[mod] .. b.label
-                local info = C_Spell and C_Spell.GetSpellInfo(bind.text)
+                local info = self:GetSpellInfo(bind.text)
                 if not info then
                     print(("  %s: |cffff4040%s — not found. Check spelling or that it exists in Forever.|r"):format(label, bind.text))
                 else
@@ -1402,7 +1428,7 @@ function TM:PrintLoadMessage()
             local bind = bindings[mod .. b.id]
             if bind and (bind.kind == "enemy" or bind.kind == "friend" or bind.kind == "self") and bind.text ~= "" then
                 local name = "|cffffd100" .. bind.text .. "|r"
-                if C_Spell and not C_Spell.GetSpellInfo(bind.text) then
+                if C_Spell and not self:GetSpellInfo(bind.text) then
                     name = "|cffff4040" .. bind.text .. " (not found)|r"
                 end
                 parts[#parts + 1] = name .. " assigned to " .. self.MOD_LABELS[mod] .. b.label .. " Click"
@@ -1469,7 +1495,7 @@ SlashCmdList.TAUNTMASTERFOREVER = function(msg)
     elseif msg == "reset" then
         TM.db.point = { "CENTER", "CENTER", -300, 0 }
         TM:RunOutOfCombat(function() TM:RestorePosition() end)
-        Print("position reset.")
+        Print(InCombatLockdown() and "position will reset when combat ends." or "position reset.")
     else
         Help()
     end

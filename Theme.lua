@@ -1,7 +1,7 @@
 -- TauntMaster Forever: shared look for every window and widget.
 -- Flat dark panels, gold text, red accents. Loaded before Options.lua and Splash.lua.
 
-local ADDON, ns = ...
+local _, ns = ...
 local T = {}
 ns.Theme = T
 

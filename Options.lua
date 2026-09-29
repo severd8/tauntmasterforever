@@ -1,6 +1,6 @@
--- TauntMaster Forever: Settings window (quick options) and Advanced window (all bindings)
+-- TauntMaster Forever: the tabbed options window (/tm).
 
-local ADDON, ns = ...
+local _, ns = ...
 local TM = ns.TM
 
 local refreshers = {}
@@ -10,19 +10,6 @@ local function RunRefreshers() for _, fn in ipairs(refreshers) do fn() end end
 ---------------------------------------------------------------------------
 -- Widget helpers
 ---------------------------------------------------------------------------
-local function Label(parent, text, x, y, template)
-    local fs = parent:CreateFontString(nil, "OVERLAY", template or "GameFontHighlight")
-    fs:SetPoint("TOPLEFT", x, y)
-    fs:SetText(text)
-    return fs
-end
-
-
-
-
-
-
-
 ---------------------------------------------------------------------------
 -- Shared look (Theme.lua)
 ---------------------------------------------------------------------------
@@ -202,7 +189,7 @@ local function SpellKnown(spellID)
 end
 
 local function SpellLabel(s)
-    local info = C_Spell and C_Spell.GetSpellInfo(s.name)
+    local info = TM:GetSpellInfo(s.name)
     local icon = info and info.iconID and ("|T" .. info.iconID .. ":16:16:0:0|t ") or ""
     local label = icon .. s.name
     if s.note then label = label .. " |cff999999(" .. s.note .. ")|r" end
@@ -224,7 +211,7 @@ local SPELL_KINDS = { enemy = true, friend = true, self = true }
 local function ValidateSpell(text)
     text = strtrim(text or "")
     if text == "" then return nil end
-    local info = C_Spell and C_Spell.GetSpellInfo(text)
+    local info = TM:GetSpellInfo(text)
     if not info then return "missing" end
     if SpellKnown(info.spellID) == false then return "unlearned", info.name end
     return "ok", info.name
@@ -242,7 +229,7 @@ local function CollectPlayerSpells()
         end
     end
     for _, s in ipairs(TM:GetClassSpells()) do
-        local info = C_Spell and C_Spell.GetSpellInfo(s.name)
+        local info = TM:GetSpellInfo(s.name)
         add(info and info.name or s.name, info and info.iconID)
     end
     pcall(function()
@@ -725,7 +712,7 @@ local function SpellSelector(parent, x, y, w, key)
     AddRefresher(function()
         b:SetText(BindingText(key))
         local bind = TM:GetBindings()[key]
-        local info = bind and bind.text ~= "" and C_Spell and C_Spell.GetSpellInfo(bind.text)
+        local info = bind and TM:GetSpellInfo(bind.text)
         icon:SetTexture(info and info.iconID or "Interface\\Icons\\INV_Misc_QuestionMark")
     end)
     return b
@@ -749,7 +736,10 @@ local function BuildTauntsTab(p)
     RowLabel(ann, "Message", 12, -58)
     local msg = FlatEditBox(ann, PAGE_W - 132)
     msg:SetPoint("TOPLEFT", 120, -56)
-    msg:SetScript("OnEditFocusLost", function(self) TM.db.announceText = self:GetText() end)
+    -- Saved as you type, so closing the window mid-edit keeps the text
+    msg:SetScript("OnTextChanged", function(self, userInput)
+        if userInput then TM.db.announceText = self:GetText() end
+    end)
     AddRefresher(function() msg:SetText(TM.db.announceText or "") end)
     MutedNote(ann, "{target} = the mob, {player} = the player you saved. Sent only when the taunt casts.", 120, -84, PAGE_W - 132)
 

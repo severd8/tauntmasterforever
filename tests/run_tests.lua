@@ -358,6 +358,14 @@ assertEq(#CHAT, 0, "no party message when solo")
 STATE.inGroup = true; TM.db.announceChannel = "none"
 click(bar); cast(6795)
 assertEq(#CHAT, 0, "announcements off")
+-- Say/Yell: only inside instances (the game blocks them elsewhere)
+TM.db.announceChannel = "SAY"; CHAT = {}; FAKE_TIME = FAKE_TIME + 3
+click(bar); cast(6795)
+assertEq(#CHAT, 0, "no Say outside instances")
+INSTANCE = true; FAKE_TIME = FAKE_TIME + 3
+click(bar); cast(6795)
+assertEq(#CHAT, 1, "Say inside instances")
+INSTANCE = false; TM.db.announceChannel = "none"; CHAT = {}
 FAKE_TIME = FAKE_TIME + 3
 
 step("keybindings and controller support")
@@ -678,4 +686,23 @@ STATE.class = "WARRIOR"; TM:ApplySettings()
 TM.db.tankOnly = true; TM:ApplySettings()
 assertEq(TM.main.__driver, "[stance:2] show; hide", "warrior defensive stance")
 
+step("review fixes")
+-- Unlearned class spells are found by ID (the game can't find them by name)
+assert(C_Spell.GetSpellInfo("Mocking Blow") == nil, "stub: name lookup misses unlearned spells")
+assertEq(TM:GetSpellInfo("mocking blow") and TM:GetSpellInfo("mocking blow").spellID, 694, "unlearned taunt found by ID")
+assertEq(TM:GetSpellInfo("Not A Spell"), nil, "unknown spell stays unknown")
+assertEq(TM:GetSpellInfo(nil), nil, "nil name is safe")
+-- The targeted-ally button uses the same template as the bars
+assertEq(TauntMasterForever_ally.__template, "SecureUnitButtonTemplate", "ally button template")
+-- Dragging in combat: the drop does nothing if the drag never started
+TM.db.locked = false; COMBAT = true; BLOCKED = {}
+TM.handle.__scripts.OnDragStart(TM.handle); TM.handle.__scripts.OnDragStop(TM.handle)
+assertEq(TM.main.isMoving, nil, "no drag in combat")
+COMBAT = false
+TM.handle.__scripts.OnDragStart(TM.handle); assertEq(TM.main.isMoving, true, "drag starts")
+TM.handle.__scripts.OnDragStop(TM.handle); assertEq(TM.main.isMoving, false, "drag ends")
+-- Hidden range results never get truth-tested
+SECRET_MODE = true
+for _, b in ipairs(TM.buttons) do if b:IsVisible() then TM:UpdateButton(b) end end
+SECRET_MODE = false
 print("ALL TESTS PASSED")

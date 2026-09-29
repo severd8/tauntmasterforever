@@ -1,5 +1,7 @@
 # Builds the addon and uploads it to CurseForge whenever a version tag (like v1.7.1) is pushed.
+# The tests run first; if they fail, nothing is uploaded.
 # Needs one repository secret: CF_API_KEY (your CurseForge API token).
+# Tags containing "beta" or "alpha" (e.g. v1.8.0-beta1) upload as Beta/Alpha files.
 name: Package and release
 
 on:
@@ -11,7 +13,11 @@ permissions:
   contents: write   # lets the packager also create a GitHub release
 
 jobs:
+  test:
+    uses: ./.github/workflows/test.yml
+
   release:
+    needs: test
     runs-on: ubuntu-latest
     env:
       CF_API_KEY: ${{ secrets.CF_API_KEY }}

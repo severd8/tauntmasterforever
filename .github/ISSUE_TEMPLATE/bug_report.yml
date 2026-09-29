@@ -1,0 +1,60 @@
+name: Bug report
+description: Something in TauntMaster Forever isn't working
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! The more detail you give, the faster it gets fixed.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what did you expect to happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can it be reproduced?
+      description: The steps that lead to the problem.
+      placeholder: |
+        1. Joined a 5-player dungeon
+        2. Clicked the healer's bar
+        3. ...
+  - type: dropdown
+    id: class
+    attributes:
+      label: Your class
+      options: [Warrior, Druid, Paladin, Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: group
+    attributes:
+      label: Group type
+      options: [Solo, Party, Raid]
+    validations:
+      required: true
+  - type: dropdown
+    id: combat
+    attributes:
+      label: Were you in combat?
+      options: ["Yes", "No", "Not sure"]
+  - type: input
+    id: version
+    attributes:
+      label: Addon version
+      description: Shown in your AddOns list, or type /tm debug in game.
+      placeholder: v1.7.0
+  - type: textarea
+    id: error
+    attributes:
+      label: Error message
+      description: If a Lua error appeared, paste the full text here. The error display (or an addon like BugSack) shows it.
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, other addons you use, etc.

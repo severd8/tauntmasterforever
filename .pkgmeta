@@ -6,5 +6,8 @@ manual-changelog:
   filename: CHANGELOG.md
   markup-type: markdown
 
+# Development files that don't belong in the addon download
 ignore:
   - .github
+  - tests
+  - CLAUDE.md

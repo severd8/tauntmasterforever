@@ -1,3 +1,10 @@
+## 1.9.0
+
+- New: a red X beside a bar means that player has no enemy targeted, so clicking their bar has nothing to taunt. Their bar also fades.
+- Fading now means "your click can't land": their target is out of range of your taunt, or they don't have an enemy targeted.
+- New: taunt announcements can name the mob and the player, like "Defias Thug has been taunted off of Aeri!". Use {target} and {player} in the message on the Advanced tab. This is the new default message.
+- AoE taunts announce as "Everything nearby has been taunted off of <player>!".
+
 ## 1.8.0
 
 - New: controller and keyboard support. Under Options > Keybindings > AddOns > TauntMaster Forever you can bind a key or controller button to taunt off yourself or any party member, using your Left or Right Click spell.

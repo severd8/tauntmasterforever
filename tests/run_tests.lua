@@ -405,6 +405,68 @@ KEYBINDS["CLICK TauntMasterForever_player:TMLeft"] = "PAD3"; fire("UPDATE_BINDIN
 assertEq(#BLOCKED, 0, "hint update is combat-safe")
 COMBAT = false; KEYBINDS = {}; fire("UPDATE_BINDINGS")
 
+step("no-target marker and reachability")
+STATE.inGroup, STATE.inRaid, STATE.party = true, false, 2
+STATE.unitsExist = { player = true, party1 = true, party2 = true }
+TM.db.rangeFade = true
+local p1, p2, me = TM.unitToButton.party1, TM.unitToButton.party2, TM.unitToButton.player
+local function refresh() tick() end
+-- Hostile target in range: bright, no marker
+RANGE = {}; HOSTILE = {}; refresh()
+assertEq(p1.bar.__alpha, 1, "in range: bright"); assertEq(p1.noTarget.__alpha, 0, "in range: no marker")
+-- Out of range: dim, no marker
+RANGE.party1target = false; refresh()
+assertEq(p1.bar.__alpha, 0.35, "out of range: dim"); assertEq(p1.noTarget.__alpha, 0, "out of range: still no marker")
+-- No enemy targeted (e.g. healer targeting the tank): dim + marker
+RANGE.party1target = "none"; HOSTILE.party1target = false; refresh()
+assertEq(p1.bar.__alpha, 0.35, "no enemy target: dim"); assertEq(p1.noTarget.__alpha, 1, "no enemy target: marker")
+assertEq(p2.noTarget.__alpha, 0, "other bars unaffected")
+-- Your own bar never dims or shows the marker
+RANGE.playertarget = "none"; refresh()
+assertEq(me.bar.__alpha, 1, "own bar bright"); assertEq(me.noTarget.__alpha, 0, "own bar no marker")
+-- Hidden values: the game decides, through the same widgets
+SECRET_MODE = true; refresh()
+assert(issecretvalue(p1.noTarget.__alpha) and p1.noTarget.__alpha.v == 1, "secret marker shown")
+assert(issecretvalue(p1.bar.__alpha) and p1.bar.__alpha.v == 0.35, "secret dim")
+assert(issecretvalue(p2.noTarget.__alpha) and p2.noTarget.__alpha.v == 0, "secret marker hidden")
+SECRET_MODE = false
+-- Turning the option off clears both
+TM.db.rangeFade = false; refresh()
+assertEq(p1.bar.__alpha, 1, "option off: bright"); assertEq(p1.noTarget.__alpha, 0, "option off: no marker")
+-- Left Click not a learned targeted taunt: falls back to distance, no marker
+TM.db.rangeFade = true; TM:GetBindings()["1"] = { kind = "enemy", text = "Taunt" }; refresh()
+assertEq(p1.noTarget.__alpha, 0, "unlearned taunt: no marker")
+TM.db.bindings.DRUID = TM:DefaultBindings(); TM:ApplyBindings()
+RANGE = {}; HOSTILE = {}; refresh()
+
+step("announcements with names")
+TM.db.announceChannel = "PARTY"; TM.db.announceText = DEFAULT_TEXT or "{target} has been taunted off of {player}!"
+local function clickCast(b, mouse, id) CHAT = {}; b.__scripts.PreClick(b, mouse or "LeftButton"); fire("UNIT_SPELLCAST_SUCCEEDED", "player", "g", id or 6795); FAKE_TIME = FAKE_TIME + 3 end
+clickCast(p1)
+assertEq(CHAT[1], "PARTY:Name_party1target has been taunted off of Name_party1!", "names filled in")
+clickCast(p1, "RightButton", 5209)
+assertEq(CHAT[1], "PARTY:Everything nearby has been taunted off of Name_party1!", "AoE taunt wording")
+clickCast(TauntMasterForever_ally, "TMLeft")
+assertEq(CHAT[1], "PARTY:Name_targettarget has been taunted off of Name_target!", "targeted ally names")
+SECRET_MODE = true; clickCast(p1); SECRET_MODE = false
+assertEq(CHAT[1], "PARTY:The mob has been taunted off of my ally!", "hidden names fall back to plain words")
+TM.db.announceText = "Taunted {target}! {player} is safe, 100%"
+clickCast(p1)
+assertEq(CHAT[1], "PARTY:Taunted Name_party1target! Name_party1 is safe, 100%", "custom text with both tokens and a % sign")
+TM.db.announceText = "Taunted!"; clickCast(p1)
+assertEq(CHAT[1], "PARTY:Taunted!", "text without tokens unchanged")
+TM.db.announceChannel = "none"
+
+step("settings migration")
+local savedDB = TauntMasterForeverDB
+TauntMasterForeverDB = { announceText = "Taunted!", schema = 2 }
+fire("ADDON_LOADED", "TauntMasterForever")
+assertEq(TM.db.announceText, "{target} has been taunted off of {player}!", "old default message upgraded")
+TauntMasterForeverDB = { announceText = "My own text", schema = 2 }
+fire("ADDON_LOADED", "TauntMasterForever")
+assertEq(TM.db.announceText, "My own text", "custom message kept")
+TauntMasterForeverDB = savedDB; TM.db = savedDB
+
 step("header menu")
 MENUS = {}
 TM.handle.__scripts.OnMouseUp(TM.handle, "RightButton")

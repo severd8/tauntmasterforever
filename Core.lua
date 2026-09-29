@@ -130,7 +130,7 @@ local DEFAULTS = {
     cdShowWhenReady = false,
     cdIconSize = 26,
     announceChannel = "none",
-    announceText = "Taunted!",
+    announceText = "{target} has been taunted off of {player}!",
     point = { "CENTER", "CENTER", -300, 0 },
     bindings = {},
 }
@@ -278,10 +278,19 @@ function TM:CreateUnitButton(parent, unit)
     btn.statusText = status
 
     local mana = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    mana:SetPoint("LEFT", btn, "RIGHT", 4, 0)
+    mana:SetPoint("LEFT", btn, "RIGHT", 20, 0)
     mana:SetTextColor(0.35, 0.65, 1)
     mana:Hide()
     btn.manaText = mana
+
+    -- "No enemy targeted" marker: this player has nothing hostile targeted, so a click
+    -- has nothing to taunt. Its alpha comes from the game (may be hidden from addons).
+    local noTarget = btn:CreateTexture(nil, "OVERLAY")
+    noTarget:SetSize(14, 14)
+    noTarget:SetPoint("LEFT", btn, "RIGHT", 3, 0)
+    noTarget:SetTexture("Interface\\RaidFrame\\ReadyCheck-NotReady")
+    noTarget:SetAlpha(0)
+    btn.noTarget = noTarget
 
     -- Keybinding hint, just left of the bar (controller / keyboard users)
     local hint = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -308,7 +317,7 @@ function TM:CreateUnitButton(parent, unit)
     btn:SetScript("OnEnter", Button_OnEnter)
     btn:SetScript("OnLeave", Button_OnLeave)
     btn:HookScript("OnShow", function(b) TM:UpdateButton(b) end)
-    btn:HookScript("PreClick", function(_, mouseButton) TM:OnBarClick(mouseButton) end)
+    btn:HookScript("PreClick", function(self, mouseButton) TM:OnBarClick(mouseButton, self) end)
 
     RegisterUnitWatch(btn)
 
@@ -350,35 +359,63 @@ local function SetHealthText(fs, unit)
     fs:SetText("")
 end
 
--- Returns an alpha (possibly secret) for range fading.
--- Uses your Left Click taunt vs. the member's target; falls back to the member's own range.
-function TM:RangeAlpha(btn)
-    local unit = btn.unit
-    local isMe = UnitIsUnit(unit, "player")
-    if not IsSecret(isMe) and isMe then return 1 end
+-- Can a click on this bar land? Returns two alphas, either of which may be hidden
+-- from addons (secret), so they're only ever handed to widgets:
+--   barAlpha    1 = your Left Click taunt can reach the player's target, DIM = it can't
+--               (out of range, or they have no enemy targeted)
+--   markerAlpha 1 = show the "no enemy targeted" marker, 0 = hide it
+-- If your Left Click spell isn't a targeted taunt you've learned, falls back to the
+-- player's own distance from you and never shows the marker.
+local DIM = 0.35
 
-    local r
-    local bind = self:GetBindings()["1"]
-    if bind and bind.kind == "enemy" and bind.text ~= "" and C_Spell and C_Spell.IsSpellInRange then
-        local target = btn.isToT and "target" or (unit .. "target")
-        r = C_Spell.IsSpellInRange(bind.text, target)
-    end
-    if not IsSecret(r) and r == nil then
-        local inRange, checked = UnitInRange(unit)
-        if not IsSecret(checked) and not checked then
-            r = true
-        else
-            r = inRange
-        end
-    end
-    if IsSecret(r) then
+local function BoolAlpha(b, whenTrue, whenFalse)
+    if IsSecret(b) then
         if C_CurveUtil and C_CurveUtil.EvaluateColorValueFromBoolean then
-            local ok, a = pcall(C_CurveUtil.EvaluateColorValueFromBoolean, r, 1, 0.35)
+            local ok, a = pcall(C_CurveUtil.EvaluateColorValueFromBoolean, b, whenTrue, whenFalse)
             if ok then return a end
         end
-        return 1
+        return nil
     end
-    return (r == false) and 0.35 or 1
+    return b and whenTrue or whenFalse
+end
+
+local function IsKnownSpell(name)
+    local info = C_Spell and C_Spell.GetSpellInfo(name)
+    if not info then return false end
+    if IsPlayerSpell then return IsPlayerSpell(info.spellID) end
+    if C_SpellBook and C_SpellBook.IsSpellInSpellBook then return C_SpellBook.IsSpellInSpellBook(info.spellID) end
+    return true
+end
+
+function TM:RangeState(btn)
+    local unit = btn.unit
+    local isMe = UnitIsUnit(unit, "player")
+    if not IsSecret(isMe) and isMe then return 1, 0 end
+
+    local bind = self:GetBindings()["1"]
+    if bind and bind.kind == "enemy" and bind.text ~= "" and C_Spell and C_Spell.IsSpellInRange
+        and IsKnownSpell(bind.text) then
+        local target = btn.isToT and "target" or (unit .. "target")
+        local r = C_Spell.IsSpellInRange(bind.text, target)
+        if IsSecret(r) then
+            local marker = 0
+            if not btn.isToT then
+                -- Whether their target is an enemy decides the marker
+                marker = BoolAlpha(UnitCanAttack("player", target), 0, 1) or 0
+            end
+            return BoolAlpha(r, 1, DIM) or 1, marker
+        end
+        if r == nil then
+            -- The taunt can't be cast on their target at all: no target, friendly, or dead
+            return DIM, btn.isToT and 0 or 1
+        end
+        return r and 1 or DIM, 0
+    end
+
+    -- Fallback: the player's own distance from you
+    local inRange, checked = UnitInRange(unit)
+    if not IsSecret(checked) and not checked then return 1, 0 end
+    return BoolAlpha(inRange, 1, DIM) or 1, 0
 end
 
 function TM:UpdateButton(btn)
@@ -415,10 +452,11 @@ function TM:UpdateButton(btn)
 
     -- Range fade (bar only; the secure button itself is never touched in combat).
     -- The alpha may be secret, so it's never truth-tested.
-    local alpha = 1
-    if db.rangeFade then alpha = self:RangeAlpha(btn) end
+    local alpha, marker = 1, 0
+    if db.rangeFade then alpha, marker = self:RangeState(btn) end
     pcall(btn.bar.SetAlpha, btn.bar, alpha)
     pcall(btn.bg.SetAlpha, btn.bg, alpha)
+    if not pcall(btn.noTarget.SetAlpha, btn.noTarget, marker) then btn.noTarget:SetAlpha(0) end
 
     local dead = UnitIsDeadOrGhost(unit)
     local connected = UnitIsConnected(unit)
@@ -427,6 +465,7 @@ function TM:UpdateButton(btn)
     if isDead or isOff then
         btn.bar:SetStatusBarColor(0.25, 0.25, 0.25)
         btn.statusText:SetText(isDead and "Dead" or "Off")
+        btn.noTarget:SetAlpha(0)
         SetFlash(btn, false)
         btn.lastThreat = 0
         return
@@ -684,8 +723,23 @@ local function ModifierPrefix()
     return p
 end
 
+-- Names for the announcement, read at click time (after the taunt, the mob targets you).
+-- Names the game hides from addons, or missing ones, fall back to plain words.
+local function SafeName(unit)
+    if not unit then return nil end
+    local name = UnitName(unit)
+    if IsSecret(name) or type(name) ~= "string" or name == "" then return nil end
+    return name
+end
+
+-- Which unit the click taunts, and which friendly player it's saving
+local function ClickUnits(btn)
+    if btn.isToT then return "target", "targettarget" end
+    return btn.unit .. "target", btn.unit   -- bars and the "targeted ally" button (unit "target")
+end
+
 -- Called just before a bar's click runs its spell
-function TM:OnBarClick(mouseButton)
+function TM:OnBarClick(mouseButton, btn)
     pendingAnnounce = nil
     if not CHAT_TYPES[self.db.announceChannel] then return end
     local bind
@@ -698,7 +752,15 @@ function TM:OnBarClick(mouseButton)
         bind = self:GetBindings()[ModifierPrefix() .. suffix]
     end
     if bind and (bind.kind == "enemy" or bind.kind == "self") and bind.text ~= "" then
-        pendingAnnounce = { spell = bind.text:lower(), time = GetTime() }
+        local mobUnit, allyUnit = nil, nil
+        if btn then mobUnit, allyUnit = ClickUnits(btn) end
+        pendingAnnounce = {
+            spell = bind.text:lower(),
+            time = GetTime(),
+            -- AoE taunts hit everything around you, not one mob
+            target = (bind.kind == "self") and "Everything nearby" or SafeName(mobUnit),
+            player = SafeName(allyUnit),
+        }
     end
 end
 
@@ -720,13 +782,21 @@ function TM:OnSpellCastSucceeded(spellID)
         end
     end
     pendingAnnounce = nil
-    self:SendAnnounce()
+    self:SendAnnounce(p.target, p.player)
 end
 
-function TM:SendAnnounce()
+-- Fills in {target} and {player}; capitalizes the first letter
+function TM:FormatAnnounce(text, target, player)
+    local out = text:gsub("{target}", function() return target or "the mob" end)
+    out = out:gsub("{player}", function() return player or "my ally" end)
+    return (out:gsub("^%l", string.upper))
+end
+
+function TM:SendAnnounce(target, player)
     local chat = CHAT_TYPES[self.db.announceChannel]
     local text = self.db.announceText
     if not chat or not text or text == "" then return end
+    text = self:FormatAnnounce(text, target, player)
     -- Skip channels you can't talk in right now instead of showing an error
     if chat == "PARTY" and not IsInGroup() then return end
     if (chat == "RAID" or chat == "RAID_WARNING") and not IsInRaid() then return end
@@ -1158,7 +1228,7 @@ function TM:BuildFrames()
     ally.unit = "target"
     ally:SetAttribute("unit", "target")
     ally:RegisterForClicks("AnyUp")
-    ally:HookScript("PreClick", function(_, mouseButton) TM:OnBarClick(mouseButton) end)
+    ally:HookScript("PreClick", function(self, mouseButton) TM:OnBarClick(mouseButton, self) end)
     self.allyButton = ally
 
     self:BuildMinimapButton()
@@ -1396,6 +1466,12 @@ events:SetScript("OnEvent", function(_, event, arg1)
         if (TM.db.schema or 0) < 2 then
             TM.db.aggroSound = false -- aggro sound is now off by default
             TM.db.schema = 2
+        end
+        if TM.db.schema < 3 then
+            if TM.db.announceText == "Taunted!" then -- old default: switch to the one with names
+                TM.db.announceText = DEFAULTS.announceText
+            end
+            TM.db.schema = 3
         end
         -- Older versions allowed both cooldown modes at once
         if TM.db.cdShowOnCooldown and TM.db.cdShowWhenReady then

@@ -14,6 +14,7 @@ It's a from-scratch rebuild of the classic *TauntMaster* addon, written for Fore
   - **Grey** — fine
   - **Yellow** — has more threat than the tank
   - **Orange** — is being attacked, but isn't firmly holding the mob
+- **Can your click land?** A bar fades when your taunt can't reach that player's target, and a **red X** beside it means they have no enemy targeted, so clicking won't taunt anything. That's your cue for an AoE taunt or tab-targeting.
   - **Red** — has aggro
 - **Click to taunt** — click a member's bar and your taunt is cast on *their* target. Your own target never changes.
 - **Every mouse button and modifier is bindable** — Left, Right and Middle click, each with Shift, Ctrl and Alt. Bind a spell, a macro, assist, or target.
@@ -24,7 +25,7 @@ It's a from-scratch rebuild of the classic *TauntMaster* addon, written for Fore
 - **Target's target bar** — see who your target is hitting, and click it to taunt your target.
 - **Raid support** — raid bars are grouped by raid group.
 - **Extras** — health %, range fading, role icons, sort by role, bar textures, text sizes, class colors, and a "only show in Defensive Stance / Bear Form" mode.
-- **Taunt announcements** — optionally announce your taunts in party, raid, instance or raid warning chat.
+- **Taunt announcements** — optionally announce your taunts in party, raid, instance or raid warning chat, like "Defias Thug has been taunted off of Aeri!". Sent only when the taunt actually casts. Use `{target}` and `{player}` in your own message.
 
 ## Installation
 

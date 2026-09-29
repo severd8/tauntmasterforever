@@ -462,8 +462,8 @@ local function BuildAdvancedPage(page)
     AddRefresher(function() msg:SetText(TM.db.announceText or "") end)
 
     local note = Label(page,
-        "Announces only when a taunt you clicked on a bar actually casts, so nothing is\n" ..
-        "sent if it's on cooldown or out of range. Say and Yell only work inside instances.",
+        "{target} = the mob, {player} = the player you saved. Sent only when a taunt you\n" ..
+        "clicked actually casts. Say and Yell only work inside instances.",
         16, -302, "GameFontDisableSmall")
     note:SetJustifyH("LEFT")
 end
@@ -791,7 +791,7 @@ local function BuildExtrasPage(page)
 
     Label(page, "Bars", 16, -94, "GameFontNormalLarge")
     Check(page, "Show health % (replaces the aggro words)", 16, -116, "healthText")
-    Check(page, "Fade members out of taunt range", 16, -142, "rangeFade")
+    Check(page, "Fade bars your taunt can't reach (red X = no enemy targeted)", 16, -142, "rangeFade")
     Check(page, "Show role icons", 16, -168, "roleIcons")
     Check(page, "Sort by role: tanks, healers, then damage", 16, -194, "sortByRole")
     local sortNote = Label(page, "Sorting only updates out of combat. In raids, sorts within each group.", 44, -216, "GameFontDisableSmall")

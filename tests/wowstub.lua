@@ -198,10 +198,26 @@ C_SpellBook = {
 C_Spell = {
     GetSpellInfo = function(n) return lookup(n) end,
     GetSpellCooldown = function(id) return { startTime = maybeSecret(100), duration = maybeSecret(10) } end,
-    IsSpellInRange = function(n, u) return maybeSecret(true) end,
+    -- RANGE[unit] = true / false / "none" (spell can't be cast on it -> nil)
+    IsSpellInRange = function(n, u)
+        local r = RANGE[u]
+        if r == "none" then return SECRET_MODE and maybeSecret(false) or nil end
+        if r == nil then r = true end
+        return maybeSecret(r)
+    end,
 }
 function IsPlayerSpell(id) return id ~= 355 end   -- Druid hasn't learned Taunt
-C_CurveUtil = { CreateCurve = function() return newObj("Curve") end }
+C_CurveUtil = {
+    CreateCurve = function() return newObj("Curve") end,
+    EvaluateColorValueFromBoolean = function(b, t, f)
+        local v = b
+        if issecretvalue(b) then v = b.v end
+        return maybeSecret(v and t or f)
+    end,
+}
+RANGE = {}
+HOSTILE = {}   -- HOSTILE[unit] = false for a friendly / missing target (default: hostile)
+function UnitCanAttack(a, u) return maybeSecret(HOSTILE[u] ~= false) end
 CurveConstants = { ScaleTo100 = newObj("Curve") }
 Enum = { LuaCurveType = { Step = 1 }, SpellBookSpellBank = { Player = 0 } }
 C_AddOns = { GetAddOnMetadata = function() return "test" end }

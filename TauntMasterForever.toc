@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: TauntMaster Forever
+## Notes: Click a party/raid member's bar to taunt their target off them. Bars change color with aggro.
+## Author: Tyler
+## Version: @project-version@
+## IconTexture: Interface\Icons\Spell_Nature_Reincarnation
+## SavedVariables: TauntMasterForeverDB
+## X-License: MIT
+## X-Curse-Project-ID: 1717418
+## X-Category: Combat
+
+Core.lua
+Options.lua

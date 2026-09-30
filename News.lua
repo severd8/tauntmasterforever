@@ -6,6 +6,10 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.13.0", date = "2026-09-30", items = {
+        "Nameplate marks: the logo appears over mobs attacking your healer or DPS. Click the mob to taunt it.",
+        "New option (off by default): backup taunt when a player has a friend targeted instead of an enemy.",
+    } },
     { version = "1.12.2", date = "2026-09-30", items = {
         "Taunt cooldown icons now show and hide correctly in dungeons.",
     } },

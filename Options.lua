@@ -743,9 +743,12 @@ local function BuildTauntsTab(p)
     AddRefresher(function() msg:SetText(TM.db.announceText or "") end)
     MutedNote(ann, "{target} = the mob, {player} = the player you saved. Sent only when the taunt casts.", 120, -84, PAGE_W - 132)
 
-    local tot = Card(p, "Target's target", 0, -238, PAGE_W, 76)
-    Switch(tot, "Show your target's target bar", 12, -30, "showToT")
-    MutedNote(tot, "Shows who your target is hitting. Click it to taunt your own target.", 50, -52)
+    local more = Card(p, "More ways to taunt", 0, -238, PAGE_W, 130)
+    Switch(more, "Show your target's target bar", 12, -30, "showToT")
+    MutedNote(more, "Shows who your target is hitting. Click it to taunt your own target.", 50, -52)
+    Switch(more, "Backup taunt when they have no enemy targeted", 12, -76, "tauntFallback")
+    MutedNote(more, "If they're targeting a friend (like a healer targeting who they heal), "
+        .. "taunts what that friend is fighting instead. Not always the mob that's on them.", 50, -98, PAGE_W - 62)
 end
 
 local function BuildBindingsTab(p)
@@ -839,6 +842,11 @@ local function BuildAlertsTab(p)
         TM:UpdateCooldowns()
     end)
     FlatSlider(cd, "Icon size", 284, -30, 244, "cdIconSize", 16, 64)
+
+    local plates = Card(p, "Nameplates", 0, -294, PAGE_W, 76)
+    Switch(plates, "Mark mobs attacking your party on their nameplates", 12, -30, "nameplateMarks",
+        false, nil, function() TM:UpdatePlateMarks() end)
+    MutedNote(plates, "Click the marked mob to taunt it. Enemy nameplates must be on (V key).", 50, -52)
 end
 
 local function BuildGeneralTab(p)

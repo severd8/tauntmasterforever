@@ -1,3 +1,9 @@
+## 1.13.0
+
+- New: **nameplate marks**. The TauntMaster Forever logo appears over any enemy that's attacking someone other than you or another tank, so you can click it and taunt it, even when that player (like a healer) has no enemy targeted. On by default; turn it off in the Alerts tab. Needs enemy nameplates on (V key).
+- New option: **backup taunt when they have no enemy targeted** (Taunts tab, off by default). If the clicked player is targeting a friend, the click taunts what that friend is fighting.
+- The README and description explain why players who target a friend can't be taunted off with a click, and the ways around it.
+
 ## 1.12.2
 
 - Fixed: in dungeons, the taunt cooldown icons always showed, ignoring "Show on cooldown" / "Show when ready". The game hides cooldown times there, so the addon now uses the game's on-cooldown flag instead.

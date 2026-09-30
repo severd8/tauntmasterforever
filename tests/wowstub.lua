@@ -145,7 +145,23 @@ function UnitPowerMax(u, t) if u == "player" then return 542 end return maybeSec
 function UnitPowerType(u) return 0 end
 function UnitPowerPercent(u, t, pred, curve) return maybeSecret(0.5) end
 function UnitThreatSituation(u) local t = STATE.threat[u] if t == nil then return nil end return maybeSecret(t) end
-function UnitIsUnit(a, b) return a == b end
+-- MOB_TARGET["nameplate1"] = "party2": that mob is attacking party2.
+-- SECRET_UNITISUNIT: the game hides the answer for nameplate units (like in instances).
+MOB_TARGET = {}
+function UnitIsUnit(a, b)
+    local mob = type(a) == "string" and a:match("^(nameplate%d+)target$")
+    if mob then
+        local r = MOB_TARGET[mob] == b
+        if SECRET_UNITISUNIT then return secret(r) end
+        return r
+    end
+    return a == b
+end
+PLATES = {}
+C_NamePlate = { GetNamePlateForUnit = function(u)
+    PLATES[u] = PLATES[u] or newObj("Frame", nil, UIParent)
+    return PLATES[u]
+end }
 function UnitIsDeadOrGhost(u) return false end
 function UnitIsConnected(u) return true end
 function UnitInRange(u) return maybeSecret(true), true end

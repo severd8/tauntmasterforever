@@ -145,6 +145,8 @@ local DEFAULTS = {
     rangeFade = true,
     roleIcons = true,
     showToT = false,
+    tauntFallback = false,   -- no enemy targeted: taunt what their target is fighting
+    nameplateMarks = true,   -- mark mobs attacking a non-tank on their nameplates
     tankOnly = false,
     barTexture = "blizzard",
     manaWarnPct = 20,
@@ -436,6 +438,19 @@ local function IsKnownSpell(name)
     return true
 end
 
+-- The enemy a click on this bar taunts. With the backup option on, when the
+-- player's target is friendly (a healer targeting someone they heal), it's
+-- what that friend is targeting instead. Matches the click macro.
+function TM:EnemyUnitFor(btn)
+    if btn.isToT then return "target" end
+    local unit = btn.unit .. "target"
+    if self.db.tauntFallback then
+        local hostile = UnitCanAttack("player", unit)
+        if not IsSecret(hostile) and not hostile then return unit .. "target" end
+    end
+    return unit
+end
+
 function TM:RangeState(btn)
     local unit = btn.unit
     local isMe = UnitIsUnit(unit, "player")
@@ -444,7 +459,7 @@ function TM:RangeState(btn)
     local bind = self:GetBindings()["1"]
     if bind and bind.kind == "enemy" and bind.text and bind.text ~= "" and C_Spell and C_Spell.IsSpellInRange
         and IsKnownSpell(bind.text) then
-        local target = btn.isToT and "target" or (unit .. "target")
+        local target = self:EnemyUnitFor(btn)
         local r = C_Spell.IsSpellInRange(bind.text, target)
         if IsSecret(r) then
             local marker = 0
@@ -556,6 +571,7 @@ function TM:RefreshAll()
     end
     self:UpdateManaWarning()
     self:UpdateCooldowns()
+    self:UpdatePlateMarks()
 end
 
 ---------------------------------------------------------------------------
@@ -761,6 +777,129 @@ function TM:UpdateCooldowns()
 end
 
 ---------------------------------------------------------------------------
+-- Nameplate marks: the TauntMaster Forever logo over any enemy that's attacking
+-- someone other than you or another tank, so you can click it and taunt.
+-- Only shows information; you still pick the target. Needs enemy nameplates on.
+--
+-- In instances the game may hide whether two units are the same (secret). Then
+-- each plate gets one stacked logo per group member, and the game sets each
+-- one's alpha, so the mark shows if the mob is on any of them.
+---------------------------------------------------------------------------
+local plates = {}   -- nameplate unit token -> true while shown
+
+local function PlateMark(plate)
+    if plate.tmForeverMark then return plate.tmForeverMark end
+    local m = CreateFrame("Frame", nil, plate)
+    m:SetSize(24, 24)
+    m:SetPoint("BOTTOM", plate, "TOP", 0, 2)
+    m:SetFrameLevel((plate:GetFrameLevel() or 0) + 20)
+    m.layers = {}
+    m.name = m:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    m.name:SetPoint("LEFT", m, "RIGHT", 2, 0)
+    m.name:SetTextColor(1, 0.35, 0.25)
+    m:Hide()
+    plate.tmForeverMark = m
+    return m
+end
+
+local function MarkLayer(m, i)
+    local t = m.layers[i]
+    if not t then
+        t = m:CreateTexture(nil, "OVERLAY")
+        t:SetAllPoints()
+        t:SetTexture(ns.Theme and ns.Theme.LOGO or "Interface\\Icons\\Ability_Physical_Taunt")
+        m.layers[i] = t
+    end
+    return t
+end
+
+local function HideMark(unit)
+    local plate = C_NamePlate and C_NamePlate.GetNamePlateForUnit and C_NamePlate.GetNamePlateForUnit(unit)
+    if plate and plate.tmForeverMark then plate.tmForeverMark:Hide() end
+end
+
+-- Group members worth protecting: everyone but you and players marked as tanks
+local function WatchedMembers()
+    local list = {}
+    local units = {}
+    if IsInRaid() then
+        for i = 1, GetNumGroupMembers() do units[#units + 1] = "raid" .. i end
+    elseif IsInGroup() then
+        for i = 1, GetNumSubgroupMembers() do units[#units + 1] = "party" .. i end
+    end
+    for _, u in ipairs(units) do
+        local me = UnitIsUnit(u, "player")
+        local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(u)
+        local isTank = not IsSecret(role) and role == "TANK"
+        if not (not IsSecret(me) and me) and not isTank then list[#list + 1] = u end
+    end
+    return list
+end
+
+function TM:UpdatePlateMark(unit, members)
+    local plate = C_NamePlate.GetNamePlateForUnit(unit)
+    if not plate then return end
+    local ok, m = pcall(PlateMark, plate)   -- some plates are off limits to addons
+    if not ok or not m then return end
+
+    local hostile = UnitCanAttack("player", unit)
+    if (not IsSecret(hostile) and not hostile) or #members == 0 then m:Hide() return end
+
+    local mobTarget = unit .. "target"
+    local shownLayers, hidden = 0, false
+    for i, u in ipairs(members) do
+        local same = UnitIsUnit(mobTarget, u)
+        if IsSecret(same) then
+            hidden = true
+            local layer = MarkLayer(m, i)
+            local a = BoolAlpha(same, 1, 0, 0)
+            if not pcall(layer.SetAlpha, layer, a) then layer:SetAlpha(0) end
+            layer:Show()
+            shownLayers = i
+        elseif same then
+            -- Readable: one logo plus who it's hitting
+            for j, t in ipairs(m.layers) do t:SetShown(j == 1) end
+            MarkLayer(m, 1):SetAlpha(1)
+            MarkLayer(m, 1):Show()
+            m.name:SetText(UnitName(u))
+            m:Show()
+            return
+        end
+    end
+    if hidden then
+        for j, t in ipairs(m.layers) do if j > shownLayers then t:Hide() end end
+        m.name:SetText("")
+        m:Show()
+    else
+        m:Hide()
+    end
+end
+
+function TM:UpdatePlateMarks()
+    if not (self.db and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
+    local on = self.db.nameplateMarks and (IsInGroup() or IsInRaid())
+    local members = on and WatchedMembers() or {}
+    for unit in pairs(plates) do
+        if on then
+            local ok = pcall(self.UpdatePlateMark, self, unit, members)
+            if not ok then pcall(HideMark, unit) end
+        else
+            pcall(HideMark, unit)
+        end
+    end
+end
+
+function TM:OnNamePlateAdded(unit)
+    plates[unit] = true
+    pcall(self.UpdatePlateMarks, self)
+end
+
+function TM:OnNamePlateRemoved(unit)
+    plates[unit] = nil
+    pcall(HideMark, unit)
+end
+
+---------------------------------------------------------------------------
 -- Click bindings -> secure attributes
 ---------------------------------------------------------------------------
 TM.ANNOUNCE_CHANNELS = { "none", "SAY", "YELL", "PARTY", "RAID", "INSTANCE", "RAID_WARNING" }
@@ -802,7 +941,7 @@ end
 -- Which unit the click taunts, and which friendly player it's saving
 local function ClickUnits(btn)
     if btn.isToT then return "target", "targettarget" end
-    return btn.unit .. "target", btn.unit   -- bars and the "targeted ally" button (unit "target")
+    return TM:EnemyUnitFor(btn), btn.unit   -- bars and the "targeted ally" button (unit "target")
 end
 
 -- Called just before a bar's click runs its spell
@@ -874,10 +1013,15 @@ function TM:SendAnnounce(target, player)
     if send then pcall(send, text, chat) end
 end
 
-function TM:BuildMacro(kind, text, unit, enemyUnit)
+function TM:BuildMacro(kind, text, unit, enemyUnit, fallback)
     enemyUnit = enemyUnit or (unit .. "target")
     if kind == "enemy" then
-        return "/cast [@" .. enemyUnit .. ",harm,nodead] " .. text
+        local m = "/cast [@" .. enemyUnit .. ",harm,nodead] " .. text
+        if fallback then
+            -- Their target isn't an enemy: try what their target is fighting
+            m = m .. "; [@" .. enemyUnit .. "target,harm,nodead] " .. text
+        end
+        return m
     elseif kind == "friend" then
         return "/cast [@" .. unit .. ",help,nodead] " .. text
     elseif kind == "self" then
@@ -890,6 +1034,7 @@ function TM:BuildMacro(kind, text, unit, enemyUnit)
 end
 
 function TM:ApplyBindingsToButton(btn, bindings)
+    local fallback = self.db.tauntFallback and not btn.isToT
     for _, mod in ipairs(self.MODS) do
         for _, b in ipairs(self.BUTTONS) do
             local key = mod .. b.id
@@ -905,7 +1050,7 @@ function TM:ApplyBindingsToButton(btn, bindings)
                 elseif bind.text and bind.text ~= "" then
                     btn:SetAttribute(typeAttr, "macro")
                     btn:SetAttribute(macroAttr, self:BuildMacro(bind.kind, bind.text, btn.unit,
-                        btn.isToT and "target" or nil))
+                        btn.isToT and "target" or nil, fallback))
                 end
             end
         end
@@ -925,7 +1070,7 @@ function TM:ApplyBindingsToButton(btn, bindings)
             elseif bind.text and bind.text ~= "" then
                 btn:SetAttribute(typeAttr, "macro")
                 btn:SetAttribute(macroAttr, self:BuildMacro(bind.kind, bind.text, btn.unit,
-                    btn.isToT and "target" or nil))
+                    btn.isToT and "target" or nil, fallback))
             end
         end
     end
@@ -1549,6 +1694,8 @@ events:RegisterEvent("UNIT_MAXHEALTH")
 events:RegisterEvent("SPELL_UPDATE_COOLDOWN")
 events:RegisterEvent("PLAYER_ROLES_ASSIGNED")
 events:RegisterEvent("UPDATE_BINDINGS")
+events:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+events:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
 events:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" and arg1 == ADDON then
         TauntMasterForeverDB = TauntMasterForeverDB or {}
@@ -1585,6 +1732,10 @@ events:SetScript("OnEvent", function(_, event, arg1)
         TM:UpdateKeyHints()
     elseif event == "SPELL_UPDATE_COOLDOWN" then
         TM:UpdateCooldowns()
+    elseif event == "NAME_PLATE_UNIT_ADDED" then
+        TM:OnNamePlateAdded(arg1)
+    elseif event == "NAME_PLATE_UNIT_REMOVED" then
+        TM:OnNamePlateRemoved(arg1)
     elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED" then
         if TM.db.sortByRole or IsInRaid() then TM:RequestLayout() end
         TM:RefreshAll()

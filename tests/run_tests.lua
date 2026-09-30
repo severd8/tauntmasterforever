@@ -721,4 +721,64 @@ assertEq(cdShown(false, true, true, true), true, "global cooldown counts as read
 CD_ACTIVE, CD_GCD = nil, nil
 TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady = true, false
 SECRET_MODE = true; SlashCmdList.TAUNTMASTERFOREVER("debug"); SECRET_MODE = false
+step("backup taunt (no enemy targeted)")
+STATE.class = "DRUID"; TM.db.bindings.DRUID = TM:DefaultBindings()
+assertEq(TM.db.tauntFallback, false, "backup taunt off by default")
+TM:ApplyBindings()
+assertEq(TM.unitToButton.party1.__attrs.macrotext1, "/cast [@party1target,harm,nodead] Growl", "no backup when off")
+TM.db.tauntFallback = true; TM:ApplySettings()
+assertEq(TM.unitToButton.party1.__attrs.macrotext1,
+    "/cast [@party1target,harm,nodead] Growl; [@party1targettarget,harm,nodead] Growl", "backup in click macro")
+assertEq(TM.unitToButton.party1.__attrs["*macrotext-tmleft"],
+    "/cast [@party1target,harm,nodead] Growl; [@party1targettarget,harm,nodead] Growl", "backup in keybind macro")
+assertEq(TM.totButton.__attrs.macrotext1, "/cast [@target,harm,nodead] Growl", "target's target bar unchanged")
+assertEq(TauntMasterForever_ally.__attrs["*macrotext-tmleft"],
+    "/cast [@targettarget,harm,nodead] Growl; [@targettargettarget,harm,nodead] Growl", "ally keybind backup")
+-- Range check and announcement follow the same enemy
+HOSTILE.party1target = false
+assertEq(TM:EnemyUnitFor(TM.unitToButton.party1), "party1targettarget", "friendly target -> their target's target")
+HOSTILE.party1target = nil
+assertEq(TM:EnemyUnitFor(TM.unitToButton.party1), "party1target", "enemy target used as is")
+SECRET_MODE = true
+assertEq(TM:EnemyUnitFor(TM.unitToButton.party1), "party1target", "hidden hostility: use their target")
+SECRET_MODE = false
+TM.db.announceChannel = "PARTY"; TM.db.announceText = "{target} has been taunted off of {player}!"; STATE.inGroup = true; CHAT = {}; FAKE_TIME = FAKE_TIME + 3
+HOSTILE.party1target = false
+local p1b = TM.unitToButton.party1
+p1b.__scripts.PreClick(p1b, "LeftButton"); fire("UNIT_SPELLCAST_SUCCEEDED", "player", "g", 6795)
+assertEq(CHAT[1], "PARTY:Name_party1targettarget has been taunted off of Name_party1!", "backup names the right mob")
+HOSTILE.party1target = nil; TM.db.announceChannel = "none"
+TM.db.tauntFallback = false; TM:ApplySettings()
+assertEq(TM.unitToButton.party1.__attrs.macrotext1, "/cast [@party1target,harm,nodead] Growl", "backup off again")
+
+step("nameplate marks")
+STATE.inGroup, STATE.inRaid, STATE.party = true, false, 2
+STATE.roles = {}
+assertEq(TM.db.nameplateMarks, true, "nameplate marks on by default")
+fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
+fire("NAME_PLATE_UNIT_ADDED", "nameplate2")
+local mark1 = PLATES.nameplate1.tmForeverMark
+assert(mark1, "mark created on the plate")
+MOB_TARGET = { nameplate1 = "party2", nameplate2 = "player" }
+TM:UpdatePlateMarks()
+assertEq(mark1.__shown, true, "mob on the healer is marked")
+assertEq(PLATES.nameplate2.tmForeverMark.__shown, false, "mob on you isn't marked")
+STATE.roles.party2 = "TANK"; TM:UpdatePlateMarks()
+assertEq(mark1.__shown, false, "mob on another tank isn't marked")
+STATE.roles = {}
+HOSTILE.nameplate1 = false; TM:UpdatePlateMarks()
+assertEq(mark1.__shown, false, "friendly plates aren't marked")
+HOSTILE.nameplate1 = nil
+-- Hidden answers (instances): stacked logos, the game sets their alpha
+SECRET_UNITISUNIT = true; TM:UpdatePlateMarks()
+assertEq(mark1.__shown, true, "hidden: mark frame shown, alpha decides")
+assertEq(#mark1.layers, 2, "one layer per watched member")
+SECRET_UNITISUNIT = false
+-- Turned off: hidden
+TM.db.nameplateMarks = false; TM:UpdatePlateMarks()
+assertEq(mark1.__shown, false, "off hides marks")
+TM.db.nameplateMarks = true
+fire("NAME_PLATE_UNIT_REMOVED", "nameplate1")
+assertEq(mark1.__shown, false, "removed plate's mark hidden")
+MOB_TARGET = {}
 print("ALL TESTS PASSED")

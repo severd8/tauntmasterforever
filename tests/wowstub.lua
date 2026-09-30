@@ -183,7 +183,13 @@ function GetBindingKey(cmd) return KEYBINDS[cmd] end
 function GetBindingText(key, short) return (short and key:gsub("^SHIFT%-", "s-")) or key end
 C_ChatInfo = { SendChatMessage = function(text, chat) CHAT[#CHAT + 1] = chat .. ":" .. text end }
 LE_PARTY_CATEGORY_INSTANCE = 2
-function PlaySound(k, ch) log("SOUND", k, ch) end
+-- Sound IDs the game can't play (missing from this client)
+MISSING_SOUNDS = { [37666] = true, [12197] = true }
+function PlaySound(k, ch)
+    if MISSING_SOUNDS[k] then return false end
+    log("SOUND", k, ch)
+    return true, 1
+end
 SOUNDKIT = { RAID_WARNING = 8959 }
 RAID_CLASS_COLORS = { DRUID = { r = 1, g = 0.49, b = 0.04 }, PRIEST = { r = 1, g = 1, b = 1 } }
 function RegisterUnitWatch() end

@@ -2,6 +2,7 @@
 
 - New: **nameplate marks**. The TauntMaster Forever logo appears over any enemy that's attacking someone other than you or another tank, so you can click it and taunt it, even when that player (like a healer) has no enemy targeted. On by default; turn it off in the Alerts tab. Needs enemy nameplates on (V key).
 - New option: **backup taunt when they have no enemy targeted** (Taunts tab, off by default). If the clicked player is targeting a friend, the click taunts what that friend is fighting.
+- Fixed: the "Boss Warning" aggro sound played nothing. It now uses the boss emote warning sound, and falls back to another sound if the game doesn't have it.
 - The README and description explain why players who target a friend can't be taunted off with a click, and the ways around it.
 
 ## 1.12.2

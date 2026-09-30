@@ -781,4 +781,15 @@ TM.db.nameplateMarks = true
 fire("NAME_PLATE_UNIT_REMOVED", "nameplate1")
 assertEq(mark1.__shown, false, "removed plate's mark hidden")
 MOB_TARGET = {}
+step("boss warning sound falls back")
+LOG = {}
+TM.db.aggroSoundKey = "bosswarning"; TM:TestAggroSound()
+local played
+for _, l in ipairs(LOG) do if l:find("^SOUND") then played = l end end
+assertEq(played, "SOUND 8959 " .. TM.db.aggroSoundChannel, "missing boss sounds fall back to one that plays")
+MISSING_SOUNDS = {}; LOG = {}; TM:TestAggroSound()
+played = nil
+for _, l in ipairs(LOG) do if l:find("^SOUND") then played = l end end
+assertEq(played, "SOUND 12197 " .. TM.db.aggroSoundChannel, "boss emote warning used when it exists")
+TM.db.aggroSoundKey = "raidwarning"
 print("ALL TESTS PASSED")

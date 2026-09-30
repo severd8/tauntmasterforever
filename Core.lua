@@ -361,10 +361,13 @@ end
 
 -- Aggro sound choices. SOUNDKIT names are looked up first; the numbers are fallbacks.
 TM.AGGRO_SOUNDS = {
-    { key = "raidwarning", label = "Raid Warning", kit = "RAID_WARNING", id = 8959 },
-    { key = "readycheck",  label = "Ready Check",  kit = "READY_CHECK", id = 8960 },
-    { key = "alarm",       label = "Alarm Clock",  kit = "ALARM_CLOCK_WARNING_3", id = 12889 },
-    { key = "bosswarning", label = "Boss Warning", kit = "UI_RAID_BOSS_WHISPER_WARNING", id = 37666 },
+    -- Each sound lists fallbacks (sound kit names, then IDs); the first one the
+    -- game can play is used. Not every modern sound exists in Forever.
+    { key = "raidwarning", label = "Raid Warning", try = { "RAID_WARNING", 8959 } },
+    { key = "readycheck",  label = "Ready Check",  try = { "READY_CHECK", 8960 } },
+    { key = "alarm",       label = "Alarm Clock",  try = { "ALARM_CLOCK_WARNING_3", 12889 } },
+    { key = "bosswarning", label = "Boss Warning",
+      try = { "RAID_BOSS_EMOTE_WARNING", 12197, "UI_RAID_BOSS_WHISPER_WARNING", 37666, "RAID_WARNING", 8959 } },
 }
 TM.AGGRO_SOUND_KEYS, TM.AGGRO_SOUND_LABELS = {}, {}
 for _, s in ipairs(TM.AGGRO_SOUNDS) do
@@ -385,8 +388,15 @@ local function PlayAggroSound(force)
     for _, s in ipairs(TM.AGGRO_SOUNDS) do
         if s.key == TM.db.aggroSoundKey then choice = s end
     end
-    local kit = (SOUNDKIT and SOUNDKIT[choice.kit]) or choice.id
-    pcall(PlaySound, kit, TM.db.aggroSoundChannel or "Master")
+    local channel = TM.db.aggroSoundChannel or "Master"
+    for _, k in ipairs(choice.try) do
+        local id = k
+        if type(k) == "string" then id = SOUNDKIT and SOUNDKIT[k] end
+        if id then
+            local ok, willPlay = pcall(PlaySound, id, channel)
+            if ok and willPlay then return end
+        end
+    end
 end
 
 -- "Test" button and picking a new sound in the options

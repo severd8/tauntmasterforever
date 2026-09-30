@@ -2,7 +2,7 @@
 
 A tanking addon for **World of Warcraft: Forever** (interface 16001, client 1.60.x). One bar per party/raid member, colored by threat; clicking a bar casts the bound taunt on that member's target. A from-scratch rebuild of the old TauntMaster addon.
 
-- Author: Tyler (GitHub `severd8`). New to GitHub — explain Git steps plainly when he needs to do anything himself.
+- Author: `severd8`.
 - CurseForge project ID: **1717418** (in the `.toc` as `X-Curse-Project-ID`).
 - License: MIT. Credits in README: tester "Classic Mistake" in WoW Forever; inspired by the original TauntMaster by prodigy.
 
@@ -33,7 +33,7 @@ Forever runs the modern (Midnight 12.x-style) addon API, not the Classic one.
 - **No automation.** Every taunt must come from the player's click. Never auto-taunt or auto-target.
 - **Missing APIs seen on Forever:** `Slider:SetObeyStepsOnDrag` doesn't exist (guard with `if s.SetObeyStepsOnDrag`). Guard any newer API the same way.
 - Taunt announcements are sent from Lua, not the click macro: a bar's `PreClick` hook records the clicked binding's spell (`TM:OnBarClick`), and `UNIT_SPELLCAST_SUCCEEDED` for the player sends the message if that spell succeeds within 1.5 seconds (`TM:OnSpellCastSucceeded`). Uses `C_ChatInfo.SendChatMessage` (falls back to `SendChatMessage`) inside `pcall`.
-- Tank stance conditions: Warrior Defensive Stance = `[stance:2]`, Druid Bear Form = `[form:1]` (confirmed by Tyler). Paladins have no stance; their taunt is Judgement with Seal of Fury.
+- Tank stance conditions: Warrior Defensive Stance = `[stance:2]`, Druid Bear Form = `[form:1]` (confirmed in game). Paladins have no stance; their taunt is Judgement with Seal of Fury.
 
 ## Testing
 
@@ -50,6 +50,6 @@ Things only testable in game: real click-to-taunt in a group, Forever's exact se
 1. Make the change, run the tests, add a new section at the top of `CHANGELOG.md` (e.g. `## 1.7.1`), and add the matching entry at the top of `News.lua`.
 2. Commit and push to `main`. The **Tests** workflow must be green.
 3. Tag and push the tag: `git tag v1.7.1 && git push origin v1.7.1`. Tags containing `beta` or `alpha` upload as Beta/Alpha files.
-4. The **Package and release** workflow runs the tests again, then uploads to CurseForge. Tyler checks the Actions tab for a green check and the CurseForge Files page (new files go through CurseForge review).
+4. The **Package and release** workflow runs the tests again, then uploads to CurseForge. Check the Actions tab for a green check and the CurseForge Files page (new files go through CurseForge review).
 
-Ask Tyler before pushing a tag — a tag publishes to players.
+A tag publishes to players, so only tag a tested commit.

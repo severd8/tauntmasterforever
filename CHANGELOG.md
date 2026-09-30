@@ -1,3 +1,7 @@
+## 1.13.1
+
+- The bar header keeps its red and gold look when locked, like ToppedOff Forever. Lock and unlock from the header's right-click menu.
+
 ## 1.13.0
 
 - New: **nameplate marks**. The TauntMaster Forever logo appears over any enemy that's attacking someone other than you or another tank, so you can click it and taunt it, even when that player (like a healer) has no enemy targeted. On by default; turn it off in the Alerts tab. Needs enemy nameplates on (V key).

@@ -1303,13 +1303,9 @@ function TM:UpdateHeader()
     if not self.handle then return end
     local C = ns.Theme.C
     self.handle.text:SetText(ns.Theme.NAME)
-    if self.db.locked then
-        self.handle.bg:SetColorTexture(unpack(C.side))
-        self.handle.text:SetTextColor(C.muted[1], C.muted[2], C.muted[3])
-    else
-        self.handle.bg:SetColorTexture(unpack(C.red))
-        self.handle.text:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
-    end
+    -- Same look locked or unlocked (like ToppedOff Forever); the right-click menu shows the lock
+    self.handle.bg:SetColorTexture(unpack(C.red))
+    self.handle.text:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
 end
 
 function TM:SetLocked(locked)

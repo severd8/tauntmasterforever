@@ -204,7 +204,13 @@ C_SpellBook = {
 }
 C_Spell = {
     GetSpellInfo = function(n) return lookup(n) end,
-    GetSpellCooldown = function(id) return { startTime = maybeSecret(100), duration = maybeSecret(10) } end,
+    -- CD_ACTIVE: the spell is on cooldown. In secret mode the times are hidden but
+    -- isActive / isOnGCD stay readable, like the real game.
+    GetSpellCooldown = function(id)
+        local active = CD_ACTIVE ~= false
+        return { startTime = maybeSecret(active and 100 or 0), duration = maybeSecret(active and 10 or 0),
+            isActive = active, isOnGCD = CD_GCD == true }
+    end,
     -- RANGE[unit] = true / false / "none" (spell can't be cast on it -> nil)
     IsSpellInRange = function(n, u)
         local r = RANGE[u]

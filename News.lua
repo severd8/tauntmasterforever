@@ -6,6 +6,9 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.12.2", date = "2026-09-30", items = {
+        "Taunt cooldown icons now show and hide correctly in dungeons.",
+    } },
     { version = "1.12.1", date = "2026-09-29", items = {
         "Bug fixes: range fading in instances, Say/Yell announcements, unlearned taunts, Targeted ally keybindings.",
     } },

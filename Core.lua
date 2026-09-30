@@ -731,8 +731,24 @@ function TM:UpdateCooldowns()
                     state = "ready"
                     b.cd:Clear()
                 end
+            elseif cd and type(cd.isActive) == "boolean" and not IsSecret(cd.isActive) then
+                -- In instances the times are hidden, but "is it on cooldown" isn't.
+                -- The global cooldown counts as ready.
+                local onGCD = not IsSecret(cd.isOnGCD) and cd.isOnGCD == true
+                if cd.isActive and not onGCD then
+                    state = "cd"
+                    if not (C_Spell.GetSpellCooldownDuration and b.cd.SetCooldownFromDurationObject
+                        and pcall(function()
+                            b.cd:SetCooldownFromDurationObject(C_Spell.GetSpellCooldownDuration(info.spellID))
+                        end)) then
+                        pcall(b.cd.SetCooldown, b.cd, cd.startTime, cd.duration)
+                    end
+                else
+                    state = "ready"
+                    b.cd:Clear()
+                end
             else
-                -- Cooldown hidden from addons: still draw the swipe, can't tell ready vs not
+                -- Nothing readable: still draw the swipe, can't tell ready vs not
                 state = "unknown"
                 if cd then pcall(b.cd.SetCooldown, b.cd, cd.startTime, cd.duration) end
             end
@@ -1492,6 +1508,17 @@ SlashCmdList.TAUNTMASTERFOREVER = function(msg)
         show("Warning hidden", TM.db.hideManaWarning)
         show("UnitPowerPercent available", UnitPowerPercent ~= nil)
         show("C_CurveUtil available", C_CurveUtil ~= nil and C_CurveUtil.CreateCurve ~= nil)
+        local bind = TM:GetBindings()["1"]
+        local info = bind and TM:GetSpellInfo(bind.text)
+        local cd = info and C_Spell.GetSpellCooldown and C_Spell.GetSpellCooldown(info.spellID)
+        if cd then
+            print("  Left Click cooldown (" .. info.name .. "):")
+            show("    start", cd.startTime)
+            show("    duration", cd.duration)
+            show("    isActive", cd.isActive)
+            show("    isOnGCD", cd.isOnGCD)
+            show("    duration object API", C_Spell.GetSpellCooldownDuration ~= nil)
+        end
     elseif msg == "reset" then
         TM.db.point = { "CENTER", "CENTER", -300, 0 }
         TM:RunOutOfCombat(function() TM:RestorePosition() end)

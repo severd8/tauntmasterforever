@@ -705,4 +705,20 @@ TM.handle.__scripts.OnDragStop(TM.handle); assertEq(TM.main.isMoving, false, "dr
 SECRET_MODE = true
 for _, b in ipairs(TM.buttons) do if b:IsVisible() then TM:UpdateButton(b) end end
 SECRET_MODE = false
+step("cooldown icons in instances (hidden times)")
+local icon = TM.cdIcons[1]
+local function cdShown(onCd, ready, active, gcd)
+    TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady = onCd, ready
+    CD_ACTIVE, CD_GCD = active, gcd
+    SECRET_MODE = true; TM:UpdateCooldowns(); SECRET_MODE = false
+    return icon.__shown
+end
+assertEq(cdShown(true, false, true, false), true, "on cooldown: shown with Show on cooldown")
+assertEq(cdShown(true, false, false, false), false, "ready: hidden with Show on cooldown")
+assertEq(cdShown(false, true, false, false), true, "ready: shown with Show when ready")
+assertEq(cdShown(false, true, true, false), false, "on cooldown: hidden with Show when ready")
+assertEq(cdShown(false, true, true, true), true, "global cooldown counts as ready")
+CD_ACTIVE, CD_GCD = nil, nil
+TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady = true, false
+SECRET_MODE = true; SlashCmdList.TAUNTMASTERFOREVER("debug"); SECRET_MODE = false
 print("ALL TESTS PASSED")

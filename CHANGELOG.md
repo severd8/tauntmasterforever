@@ -1,3 +1,8 @@
+## 1.12.2
+
+- Fixed: in dungeons, the taunt cooldown icons always showed, ignoring "Show on cooldown" / "Show when ready". The game hides cooldown times there, so the addon now uses the game's on-cooldown flag instead.
+- /tm debug now lists your Left Click taunt's cooldown details.
+
 ## 1.12.1
 
 - Fixed: bars could stop updating inside instances when range fading was on.

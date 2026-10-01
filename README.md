@@ -16,18 +16,18 @@ It's a from-scratch rebuild of the classic *TauntMaster* addon, written for Fore
   - **Orange** — is being attacked, but isn't firmly holding the mob
   - **Red** — has aggro
 - **Can your click land?** A bar fades when your taunt can't reach that player's target, and a **red X** beside it means they have no enemy targeted, so clicking won't taunt anything.
-- **Nameplate marks** — the TauntMaster Forever logo appears over any enemy that's attacking someone other than you or another tank. Click the marked mob to taunt it. Needs enemy nameplates turned on (V key).
+- **Nameplate marks** — the TauntMaster Forever logo appears over any enemy that's attacking someone other than you or another tank, while you're in a group. Click the marked mob's nameplate to target it, then taunt it. Needs enemy nameplates turned on (V key).
 - **Backup taunt** (optional, off by default) — when a player has a friend targeted instead of an enemy, a click taunts what that friend is fighting.
-- **Click to taunt** — click a member's bar and your taunt is cast on *their* target. Your own target never changes.
+- **Click to taunt** — click a member's bar and your taunt is cast on *their* target. Your own target never changes (except with the Assist and Target bindings).
 - **Every mouse button and modifier is bindable** — Left, Right and Middle click, each with Shift, Ctrl and Alt. Bind a spell, a macro, assist, or target.
 - **Taunt picker** — choose from every taunt your class has, with icons. Spells you haven't learned yet are marked.
 - **Taunt cooldown icons** — see when your taunts are on cooldown, or when they're ready.
-- **Low mana warning** — shows next to your bar and your healers' bars when mana drops below the level you choose.
-- **Aggro alerts** — optional flashing bar and sound when someone else pulls a mob. Pick the sound, when it plays (close to pulling, has aggro, or firmly has aggro) and which sound channel it plays on (Master, Sound Effects or Dialog).
+- **Low mana warning** — shows next to your bar and your healers' bars when mana drops below the level you choose (every mana user's bar if nobody has the Healer role).
+- **Aggro alerts** — a flashing bar (on by default) and an optional sound when someone other than a tank pulls a mob. Pick the sound, when it plays (close to pulling, has aggro, or firmly has aggro) and which sound channel it plays on (Master, Sound Effects or Dialog).
 - **Target's target bar** — see who your target is hitting, and click it to taunt your target.
 - **Raid support** — raid bars are grouped by raid group.
 - **Customizable** — health %, range fading, role icons, sort by role, bar textures, text sizes, class colors, and a "only show in Defensive Stance / Bear Form" mode.
-- **Taunt announcements** — optionally announce your taunts in party, raid, instance or raid warning chat, like "Defias Thug has been taunted off of Aeri!". Sent only when the taunt actually casts. Use `{target}` and `{player}` in your own message.
+- **Taunt announcements** — optionally announce your taunts in party, raid, instance, raid warning, say or yell chat, like "Defias Thug has been taunted off of Aeri!". Sent only when the taunt actually casts. Use `{target}` and `{player}` in your own message.
 
 ## Installation
 
@@ -56,7 +56,7 @@ Taunts cast on "their target" go to the enemy the clicked player is fighting. Bl
 
 ## Using it
 
-- **Move the bars** — drag the orange header. Lock them in place from the header's right-click menu or the options.
+- **Move the bars** — drag the red header. Lock them in place from the header's right-click menu or the options.
 - **Open the options** — type `/tm`, left-click the minimap button, or right-click the header and choose **Settings**.
 - **Show or hide the bars** — right-click the minimap button, or type `/tm toggle`.
 
@@ -83,7 +83,7 @@ Prefer a controller, or keys instead of clicking? Go to **Options → Keybinding
 |---|---|
 | **You / Party 1–4: Left Click spell** | Casts your Left Click spell on that player's target |
 | **You / Party 1–4: Right Click spell** | Casts your Right Click spell for that player |
-| **Targeted ally: Left / Right Click spell** | Target a friendly player, then press it to taunt whatever is attacking them. Works in raids too. |
+| **Targeted ally: Left / Right Click spell** | Target a friendly player, then press it to cast the spell on *their* target. Works in raids too. |
 
 Bound keys appear beside each party bar, so you always know which button saves whom. Turn the hints off on the **General** tab of the options.
 
@@ -97,7 +97,7 @@ Bound keys appear beside each party bar, so you always know which button saves w
 | `/tm spells` | Open the options at Click Bindings |
 | `/tm check` | Check that your bound spells exist and are learned |
 | `/tm news` | Show the welcome / what's new window |
-| `/tm reset` | Move the bars back to the middle of the screen |
+| `/tm reset` | Move the bars back to their default position |
 
 `/tauntmaster` works too.
 
@@ -119,7 +119,7 @@ Healers usually target the tank or whoever they're healing, not the mob hitting 
 
 Ways around it:
 
-- **Nameplate marks** (on by default) put the logo over the mob that's on them. Click it and taunt.
+- **Nameplate marks** (on by default) put the logo over the mob that's on them. Click its nameplate to target it, then taunt.
 - **Backup taunt** (Taunts tab, off by default) taunts what their friendly target is fighting. It helps when the healer targets a DPS who's fighting that mob, but it isn't always the mob that's on them.
 - **Your AoE taunt** (Challenging Roar or Challenging Shout) grabs everything near you.
 - **Healers who use mouseover healing** (Clique or mouseover macros) can keep an enemy targeted, so a click on their bar works normally.
@@ -128,7 +128,7 @@ Ways around it:
 
 - **A click on a healer does nothing** — they probably have a friend targeted, not the mob. See **Limitation** above.
 - **A click does nothing** — type `/tm check`. It lists each bound spell and whether it was found and learned. Fix any misspelled spell on the **Click Bindings** tab.
-- **The bars disappeared** — you may have hidden them, or turned on **Hide When Solo** or tank-stance-only mode. Type `/tm show`.
+- **The bars disappeared** — type `/tm show`. If they're still hidden, turn off **Hide when solo** or tank-stance-only mode on the **Layout** tab.
 - **The bars are off-screen** — type `/tm reset`.
 - **No nameplate marks** — turn on enemy nameplates (V key), and check that **Nameplate marks** is on in the **Alerts** tab.
 

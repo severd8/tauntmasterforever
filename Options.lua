@@ -846,7 +846,7 @@ local function BuildAlertsTab(p)
     local plates = Card(p, "Nameplates", 0, -294, PAGE_W, 76)
     Switch(plates, "Mark mobs attacking your party on their nameplates", 12, -30, "nameplateMarks",
         false, nil, function() TM:UpdatePlateMarks() end)
-    MutedNote(plates, "Click the marked mob to taunt it. Enemy nameplates must be on (V key).", 50, -52)
+    MutedNote(plates, "Target the marked mob, then taunt it. Enemy nameplates must be on (V key).", 50, -52)
 end
 
 local function BuildGeneralTab(p)
@@ -864,7 +864,7 @@ local function BuildGeneralTab(p)
         "|cff8fd3ff/tm toggle|r  show or hide the bars",
         "|cff8fd3ff/tm lock|r / |cff8fd3ff/tm unlock|r  lock or unlock the bars",
         "|cff8fd3ff/tm check|r  check your bound spells",
-        "|cff8fd3ff/tm news|r  what's new      |cff8fd3ff/tm reset|r  move the bars back to the center",
+        "|cff8fd3ff/tm news|r  what's new      |cff8fd3ff/tm reset|r  reset the bars' position",
     }
     for i, l in ipairs(lines) do
         local fs = Text(cmds, l, "GameFontHighlightSmall")

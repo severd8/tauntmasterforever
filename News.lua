@@ -6,6 +6,9 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.13.2", date = "2026-10-01", items = {
+        "Clearer option text for nameplate marks and /tm reset.",
+    } },
     { version = "1.13.1", date = "2026-09-30", items = {
         "The bar header keeps the same look when locked.",
     } },

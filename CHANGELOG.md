@@ -1,3 +1,8 @@
+## 1.13.2
+
+- The Alerts tab explains that you target the marked mob, then taunt it (the mark itself isn't clickable).
+- The General tab says `/tm reset` resets the bars' position, since it doesn't center them.
+
 ## 1.13.1
 
 - The bar header keeps its red and gold look when locked, like ToppedOff Forever. Lock and unlock from the header's right-click menu.

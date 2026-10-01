@@ -140,6 +140,11 @@ Found a bug or have an idea? Please [submit it on GitHub](https://github.com/sev
 
 TauntMaster Forever is free. If it has saved your group a wipe, you can [leave a small tip on Ko-fi](https://ko-fi.com/tauntmasterforever). Thank you!
 
+## Also by me
+
+- **ToppedOff Forever**: reminds you when buffs, food, reagents, ammo or gear need topping off. Free on CurseForge.
+- **Outfitter Forever**: the classic Outfitter gear manager, ported to WoW Forever. Free on CurseForge.
+
 ## Credits
 
 Special thanks to **Classic Mistake** in WoW Forever for their help with the initial testing.

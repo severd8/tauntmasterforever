@@ -10,24 +10,14 @@ It's a from-scratch rebuild of the classic *TauntMaster* addon, written for Fore
 
 ## Features
 
-- **Aggro at a glance** — every bar changes color with that player's threat:
-  - **Grey** — fine
-  - **Yellow** — has more threat than the tank
-  - **Orange** — is being attacked, but isn't firmly holding the mob
-  - **Red** — has aggro
-- **Can your click land?** A bar fades when your taunt can't reach that player's target, and a **red X** beside it means they have no enemy targeted, so clicking won't taunt anything.
-- **Nameplate marks** — the TauntMaster Forever logo appears over any enemy that's attacking someone other than you or another tank, while you're in a group. Click the marked mob's nameplate to target it, then taunt it. Needs enemy nameplates turned on (V key).
-- **Backup taunt** (optional, off by default) — when a player has a friend targeted instead of an enemy, a click taunts what that friend is fighting.
-- **Click to taunt** — click a member's bar and your taunt is cast on *their* target. Your own target never changes (except with the Assist and Target bindings).
-- **Every mouse button and modifier is bindable** — Left, Right and Middle click, each with Shift, Ctrl and Alt. Bind a spell, a macro, assist, or target.
-- **Taunt picker** — choose from every taunt your class has, with icons. Spells you haven't learned yet are marked.
-- **Taunt cooldown icons** — see when your taunts are on cooldown, or when they're ready.
-- **Low mana warning** — shows next to your bar and your healers' bars when mana drops below the level you choose (every mana user's bar if nobody has the Healer role).
-- **Aggro alerts** — a flashing bar (on by default) and an optional sound when someone other than a tank pulls a mob. Pick the sound, when it plays (close to pulling, has aggro, or firmly has aggro) and which sound channel it plays on (Master, Sound Effects or Dialog).
-- **Target's target bar** — see who your target is hitting, and click it to taunt your target.
-- **Raid support** — raid bars are grouped by raid group.
-- **Customizable** — health %, range fading, role icons, sort by role, bar textures, text sizes, class colors, and a "only show in Defensive Stance / Bear Form" mode.
-- **Taunt announcements** — optionally announce your taunts in party, raid, instance, raid warning, say or yell chat, like "Defias Thug has been taunted off of Aeri!". Sent only when the taunt actually casts. Use `{target}` and `{player}` in your own message.
+- **Click to taunt.** Click a party or raid member's bar and your taunt is cast on *their* target. Your own target doesn't change.
+- **Aggro at a glance.** Bars turn **yellow** (more threat than the tank), **orange** (being attacked) and **red** (has aggro). A faded bar means your taunt can't reach; a **red X** means that player has no enemy targeted.
+- **Nameplate marks.** The logo appears over any enemy that's attacking someone who isn't a tank. Click its nameplate, then taunt. Needs enemy nameplates (V key).
+- **Bind anything.** Left, Right and Middle click, each with Shift, Ctrl and Alt, to a spell, macro, assist or target, with a picker of your class's taunts. Keys and controller buttons work too.
+- **Alerts.** A flashing bar and an optional sound when someone pulls aggro, taunt cooldown icons, and a low mana warning for you and your healers.
+- **Target's target bar and backup taunt.** Taunt what your target is hitting, or (optional) what a player's friendly target is fighting.
+- **Taunt announcements** (optional) in party, raid, instance, say or yell chat, with your own message.
+- **Raids and looks.** Raid bars grouped by raid group; health %, role icons, sort by role, bar textures, text sizes, class colors, and a tank-stance-only mode.
 
 ## Installation
 
@@ -103,30 +93,17 @@ Bound keys appear beside each party bar, so you always know which button saves w
 
 ## Good to know
 
-WoW: Forever runs on the modern addon system, which hides some combat information from addons. TauntMaster Forever is built around those rules:
+WoW: Forever limits what addons can do in combat. TauntMaster Forever is built around those rules:
 
-- **It never acts on its own.** Every taunt is your click. Addons can't auto-taunt.
-- **Hidden values are handled by the game.** Things like your mana and party health are shown through the game's own display, so the addon never needs to read the numbers.
-- **Some changes wait until combat ends.** WoW doesn't let addons move or rearrange clickable bars during combat. If you change the layout, resize bars, or someone changes raid group mid-fight, the bars update as soon as combat ends. Colors, text and alerts always update live.
-- **Say and Yell announcements** only work inside instances. Outside them, WoW blocks addon Say and Yell messages that aren't sent directly by a key press.
-- **Tank-stance-only mode** does nothing for Paladins, since they don't have a tank stance.
-
-## Limitation: players who target a friend
-
-A click taunts **whatever the clicked player has targeted**. WoW doesn't tell addons which mob is attacking a player, and it doesn't let addons pick a target for you in combat.
-
-Healers usually target the tank or whoever they're healing, not the mob hitting them. When that happens, clicking their bar has nothing to taunt, and a **red X** shows beside it. The same goes for anyone who targets another party member.
-
-Ways around it:
-
-- **Nameplate marks** (on by default) put the logo over the mob that's on them. Click its nameplate to target it, then taunt.
-- **Backup taunt** (Taunts tab, off by default) taunts what their friendly target is fighting. It helps when the healer targets a DPS who's fighting that mob, but it isn't always the mob that's on them.
-- **Your AoE taunt** (Challenging Roar or Challenging Shout) grabs everything near you.
-- **Healers who use mouseover healing** (Clique or mouseover macros) can keep an enemy targeted, so a click on their bar works normally.
+- **It never acts on its own.** Every taunt is your click.
+- **A click taunts whatever that player has targeted.** Healers usually target a friend, so their bar shows a **red X** and there's nothing to taunt. Use the nameplate mark on the mob, the backup taunt, or your AoE taunt.
+- **Layout changes wait until combat ends.** Colors, text and alerts always update live.
+- **Say and Yell announcements** only work inside instances.
+- **Tank-stance-only mode** does nothing for Paladins, who have no tank stance.
 
 ## Troubleshooting
 
-- **A click on a healer does nothing** — they probably have a friend targeted, not the mob. See **Limitation** above.
+- **A click on a healer does nothing** — they probably have a friend targeted, not the mob. See **Good to know** above.
 - **A click does nothing** — type `/tm check`. It lists each bound spell and whether it was found and learned. Fix any misspelled spell on the **Click Bindings** tab.
 - **The bars disappeared** — type `/tm show`. If they're still hidden, turn off **Hide when solo** or tank-stance-only mode on the **Layout** tab.
 - **The bars are off-screen** — type `/tm reset`.
@@ -144,6 +121,7 @@ TauntMaster Forever is free. If it has saved your group a wipe, you can [leave a
 
 - **ToppedOff Forever**: reminds you when buffs, food, reagents, ammo or gear need topping off. Free on CurseForge.
 - **Outfitter Forever**: the classic Outfitter gear manager, ported to WoW Forever. Free on CurseForge.
+- **BattleText Forever**: scrolling combat text for your hits, heals and the damage you take. Free on CurseForge.
 
 ## Credits
 

@@ -12,50 +12,13 @@ local function RunRefreshers() for _, fn in ipairs(refreshers) do fn() end end
 ---------------------------------------------------------------------------
 local T = ns.Theme
 local C, Fill, Border, Text, FlatButton = T.C, T.Fill, T.Border, T.Text, T.FlatButton
+local MenuArrow, Card, MutedNote, RowLabel, Dropdown, FlatEditBox = T.MenuArrow, T.Card, T.Note, T.RowLabel, T.Dropdown, T.EditBox
 local SpellKnown, SPELL_KINDS = TM.SpellKnown, TM.SPELL_KINDS
-
--- The small gold arrow at the right of anything that opens a menu
-local function MenuArrow(button, inset)
-    local arrow = button:CreateTexture(nil, "OVERLAY")
-    arrow:SetSize(12, 12)
-    arrow:SetPoint("RIGHT", -inset, 0)
-    arrow:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
-    arrow:SetVertexColor(0.91, 0.63, 0.25)
-end
-
--- Card: a panel with a small orange uppercase title. Content starts at y = -28.
-local function Card(parent, title, x, y, w, h)
-    local f = CreateFrame("Frame", nil, parent)
-    f:SetPoint("TOPLEFT", x, y)
-    f:SetSize(w, h)
-    Fill(f, C.card)
-    Border(f, C.line)
-    local t = Text(f, title and title:upper() or "", "GameFontNormalSmall", C.orange)
-    t:SetPoint("TOPLEFT", 12, -10)
-    return f
-end
-
-local function MutedNote(parent, text, x, y, width)
-    local n = Text(parent, text, "GameFontDisableSmall")
-    n:SetPoint("TOPLEFT", x, y)
-    if width then n:SetWidth(width); n:SetWordWrap(true) end
-    return n
-end
-
-local function RowLabel(parent, text, x, y)
-    local fs = Text(parent, text, "GameFontHighlight", C.muted)
-    fs:SetPoint("TOPLEFT", x, y - 4)
-    return fs
-end
 
 -- On/off switch. invert = the switch shows the opposite of the saved setting.
 -- onChange(v) runs after saving; default re-applies all settings.
 local function Switch(parent, text, x, y, key, invert, labelWidth, onChange)
-    local b = T.SwitchWidget(parent)
-    b:SetPoint("TOPLEFT", x, y)
-    local label = Text(parent, text, "GameFontHighlight")
-    label:SetPoint("TOPLEFT", b, "TOPRIGHT", 8, 1)
-    if labelWidth then label:SetWidth(labelWidth); label:SetWordWrap(true) end
+    local b, label = T.LabeledSwitch(parent, text, x, y, labelWidth)
 
     local function shown()
         local v = TM.db[key] and true or false
@@ -80,78 +43,12 @@ local function Switch(parent, text, x, y, key, invert, labelWidth, onChange)
     return b, label
 end
 
--- Dropdown: shows the current choice; click for a menu of options.
-local function Dropdown(parent, width, keys, labels, getter, setter)
-    local b = CreateFrame("Button", nil, parent)
-    b:SetSize(width, 22)
-    Fill(b, C.field)
-    Border(b, C.fieldEdge)
-    local fs = Text(b, "", "GameFontHighlightSmall")
-    fs:SetPoint("LEFT", 8, 0)
-    fs:SetPoint("RIGHT", -20, 0)
-    b:SetFontString(fs)
-    MenuArrow(b, 6)
-
-    local function label(k) return labels[k] or tostring(k) end
-    local function refresh() b:SetText(label(getter())) end
-    local function choose(k) setter(k); refresh() end
-    b:SetScript("OnClick", function(self)
-        if MenuUtil and MenuUtil.CreateContextMenu then
-            MenuUtil.CreateContextMenu(self, function(_, root)
-                for _, k in ipairs(keys) do
-                    root:CreateRadio(label(k), function() return getter() == k end, function() choose(k) end)
-                end
-            end)
-        else
-            -- No menu system: step to the next choice
-            local cur, nextIdx = getter(), 1
-            for i, k in ipairs(keys) do
-                if k == cur then nextIdx = (i % #keys) + 1 break end
-            end
-            choose(keys[nextIdx])
-        end
-    end)
-    b.Refresh = refresh
-    b.Choose = choose
-    return b
-end
-
--- Flat slider: label on the left, value on the right, thin track with a gold knob
+-- Slider bound to a saved setting. onChange() runs after saving; by default the
+-- bars are laid out again.
 local function FlatSlider(parent, text, x, y, width, key, min, max, suffix, onChange, step, fmt)
-    suffix, step, fmt = suffix or "", step or 1, fmt or "%d"
-    local title = Text(parent, text, "GameFontHighlight", C.muted)
-    title:SetPoint("TOPLEFT", x, y)
-    local value = Text(parent, "", "GameFontNormal")
-    value:SetPoint("TOPRIGHT", parent, "TOPLEFT", x + width, y)
-    value:SetJustifyH("RIGHT")
-
-    local s = CreateFrame("Slider", nil, parent)
-    s:SetOrientation("HORIZONTAL")
-    s:SetSize(width, 14)
-    s:SetPoint("TOPLEFT", x, y - 18)
-    s:SetHitRectInsets(0, 0, -6, -6)
-    local track = s:CreateTexture(nil, "BACKGROUND")
-    track:SetHeight(4)
-    track:SetPoint("LEFT"); track:SetPoint("RIGHT")
-    track:SetColorTexture(unpack(C.offTrack))
-    local thumb = s:CreateTexture(nil, "OVERLAY")
-    thumb:SetSize(10, 14)
-    thumb:SetColorTexture(unpack(C.gold))
-    s:SetThumbTexture(thumb)
-    local fill = s:CreateTexture(nil, "ARTWORK")
-    fill:SetHeight(4)
-    fill:SetPoint("LEFT", track, "LEFT")
-    fill:SetPoint("RIGHT", thumb, "CENTER")
-    fill:SetColorTexture(0.72, 0.2, 0.11, 1)
-    s:SetMinMaxValues(min, max)
-    s:SetValueStep(step)
-    if s.SetObeyStepsOnDrag then s:SetObeyStepsOnDrag(true) end
-
-    s:SetScript("OnValueChanged", function(_, v)
-        v = math.floor(v / step + 0.5) * step
-        if step >= 1 then v = math.floor(v + 0.5) end
-        value:SetText(fmt:format(v) .. suffix)
-        if TM.db[key] ~= v then
+    local s = T.Slider(parent, text, x, y, width,
+        function() return TM.db[key] end,
+        function(v)
             TM.db[key] = v
             if onChange then
                 onChange()
@@ -159,27 +56,9 @@ local function FlatSlider(parent, text, x, y, width, key, min, max, suffix, onCh
                 TM:ApplyFonts()
                 TM:Layout()
             end
-        end
-    end)
-    AddRefresher(function()
-        s:SetValue(TM.db[key])
-        value:SetText(fmt:format(TM.db[key]) .. suffix)
-    end)
+        end, min, max, suffix, step, fmt)
+    AddRefresher(s.Refresh)
     return s
-end
-
--- Flat text box
-local function FlatEditBox(parent, width)
-    local eb = CreateFrame("EditBox", nil, parent)
-    eb:SetSize(width, 22)
-    eb:SetAutoFocus(false)
-    eb:SetFontObject(GameFontHighlightSmall)
-    eb:SetTextInsets(6, 6, 0, 0)
-    Fill(eb, C.field)
-    Border(eb, C.fieldEdge)
-    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    return eb
 end
 
 ---------------------------------------------------------------------------
@@ -867,138 +746,20 @@ local TABS = {
     { key = "general",    label = "General",        icon = "Interface\\Icons\\INV_Misc_Gear_01",           build = BuildGeneralTab },
 }
 
-local pages, tabButtons = {}, {}
-local currentTab
-
-local function ShowTab(key)
-    currentTab = key
-    for k, page in pairs(pages) do page:SetShown(k == key) end
-    for k, b in pairs(tabButtons) do
-        local sel = (k == key)
-        b.selBg:SetShown(sel)
-        b.accent:SetShown(sel)
-        b.icon:SetDesaturated(not sel)
-        b.icon:SetAlpha(sel and 1 or 0.7)
-        local c = sel and C.gold or C.muted
-        b.label:SetTextColor(c[1], c[2], c[3])
-    end
-    HideSuggest()
-end
+local pages, tabButtons = {}, {}   -- filled when the window is built
 
 local function BuildWindow()
-    local W, H, HEADER, FOOTER, SIDE = 740, 540, 52, 40, 170
-    win = CreateFrame("Frame", "TauntMasterForeverConfig", UIParent)
-    win:SetSize(W, H)
-    win:SetPoint("CENTER")
-    win:SetFrameStrata("DIALOG")
-    win:SetToplevel(true)
-    win:SetMovable(true)
-    win:SetClampedToScreen(true)
-    win:EnableMouse(true)
-    win:SetScript("OnShow", RunRefreshers)
-    win:SetScript("OnHide", HideSuggest)
-    win:Hide()
-    table.insert(UISpecialFrames, "TauntMasterForeverConfig")
-    Fill(win, C.win)
-    Border(win, C.edge)
-
-    -- Header: drag to move
-    local header = CreateFrame("Frame", nil, win)
-    header:SetPoint("TOPLEFT", 1, -1)
-    header:SetPoint("TOPRIGHT", -1, -1)
-    header:SetHeight(HEADER)
-    header:EnableMouse(true)
-    header:RegisterForDrag("LeftButton")
-    header:SetScript("OnDragStart", function() win:StartMoving() end)
-    header:SetScript("OnDragStop", function() win:StopMovingOrSizing() end)
-    local hbg = header:CreateTexture(nil, "BACKGROUND")
-    hbg:SetAllPoints()
-    T.HeaderGradient(hbg)
-    local hline = header:CreateTexture(nil, "BORDER")
-    hline:SetPoint("BOTTOMLEFT"); hline:SetPoint("BOTTOMRIGHT"); hline:SetHeight(1)
-    hline:SetColorTexture(unpack(C.edge))
-    local logo = header:CreateTexture(nil, "ARTWORK")
-    logo:SetSize(36, 36)
-    logo:SetPoint("LEFT", 14, 0)
-    logo:SetTexture(T.LOGO)
-    local title = Text(header, T.NAME, "GameFontNormalLarge", { 0.95, 0.9, 0.78 }, 18)
-    title:SetPoint("LEFT", logo, "RIGHT", 10, 0)
-    local ver = Text(header, "", "GameFontNormalSmall", { 0.85, 0.65, 0.35 })
-    ver:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 8, 1)
-    AddRefresher(function()
-        local v = TM.CurrentNewsVersion and TM:CurrentNewsVersion()
-        ver:SetText(v and ("v" .. v) or "")
-    end)
-    local x = FlatButton(header, "X", 24, 24)
-    x:SetPoint("RIGHT", -12, 0)
-    x:SetScript("OnClick", function() win:Hide() end)
-
-    -- Sidebar tabs
-    local side = CreateFrame("Frame", nil, win)
-    side:SetPoint("TOPLEFT", 1, -(HEADER + 1))
-    side:SetPoint("BOTTOMLEFT", 1, FOOTER + 1)
-    side:SetWidth(SIDE)
-    Fill(side, C.side)
-    local sline = side:CreateTexture(nil, "BORDER")
-    sline:SetPoint("TOPRIGHT"); sline:SetPoint("BOTTOMRIGHT"); sline:SetWidth(1)
-    sline:SetColorTexture(unpack(C.line))
-    for i, t in ipairs(TABS) do
-        local b = CreateFrame("Button", nil, side)
-        b:SetSize(SIDE - 1, 36)
-        b:SetPoint("TOPLEFT", 0, -8 - (i - 1) * 36)
-        b.selBg = b:CreateTexture(nil, "BACKGROUND")
-        b.selBg:SetAllPoints()
-        b.selBg:SetColorTexture(0.23, 0.06, 0.04, 1)
-        b.accent = b:CreateTexture(nil, "ARTWORK")
-        b.accent:SetPoint("TOPLEFT"); b.accent:SetPoint("BOTTOMLEFT"); b.accent:SetWidth(3)
-        b.accent:SetColorTexture(0.89, 0.23, 0.13, 1)
-        local hl = b:CreateTexture(nil, "HIGHLIGHT")
-        hl:SetAllPoints()
-        hl:SetColorTexture(1, 1, 1, 0.05)
-        b.icon = b:CreateTexture(nil, "ARTWORK")
-        b.icon:SetSize(18, 18)
-        b.icon:SetPoint("LEFT", 16, 0)
-        b.icon:SetTexture(t.icon)
-        b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        local fs = Text(b, "", "GameFontHighlight")
-        fs:SetPoint("LEFT", b.icon, "RIGHT", 10, 0)
-        b:SetFontString(fs)
-        b.label = fs
-        b:SetText(t.label)
-        b:SetScript("OnClick", function() ShowTab(t.key) end)
-        tabButtons[t.key] = b
-    end
-
-    -- Pages
-    for _, t in ipairs(TABS) do
-        local page = CreateFrame("Frame", nil, win)
-        page:SetPoint("TOPLEFT", SIDE + 16, -(HEADER + 14))
-        page:SetPoint("BOTTOMRIGHT", -16, FOOTER + 10)
-        local pt = Text(page, t.label, "GameFontNormalLarge", C.gold, 17)
-        pt:SetPoint("TOPLEFT", 0, 0)
-        local body = CreateFrame("Frame", nil, page)
-        body:SetPoint("TOPLEFT", 0, -30)
-        body:SetPoint("BOTTOMRIGHT")
-        t.build(body)
-        pages[t.key] = page
-    end
-
-    -- Footer
-    local foot = CreateFrame("Frame", nil, win)
-    foot:SetPoint("BOTTOMLEFT", 1, 1)
-    foot:SetPoint("BOTTOMRIGHT", -1, 1)
-    foot:SetHeight(FOOTER)
-    Fill(foot, C.side)
-    local fline = foot:CreateTexture(nil, "BORDER")
-    fline:SetPoint("TOPLEFT"); fline:SetPoint("TOPRIGHT"); fline:SetHeight(1)
-    fline:SetColorTexture(unpack(C.line))
-    local hint = Text(foot, "/tm to open  -  /tm news for what's new", "GameFontDisableSmall")
-    hint:SetPoint("LEFT", 14, 0)
-    local close = FlatButton(foot, "Close", 90)
-    close:SetPoint("RIGHT", -14, 0)
-    close:SetScript("OnClick", function() win:Hide() end)
-
-    ShowTab("taunts")
+    win = T.Window({
+        name = "TauntMasterForeverConfig",
+        tabs = TABS,
+        hint = "/tm to open  -  /tm news for what's new",
+        version = function() return TM.CurrentNewsVersion and TM:CurrentNewsVersion() end,
+        onShow = RunRefreshers,
+        onHide = HideSuggest,
+        onTab = HideSuggest,
+    })
+    for key, page in pairs(win.pages) do pages[key] = page end
+    for key, button in pairs(win.tabButtons) do tabButtons[key] = button end
 end
 
 ---------------------------------------------------------------------------
@@ -1016,9 +777,10 @@ function TM:OpenConfig(page)
     win:Show()
     win:Raise()
     local key = TAB_ALIASES[page] or page
-    if pages[key] then ShowTab(key) end
+    if pages[key] then win:ShowTab(key) end
 end
 
 TM._spellRows = spellRows
 TM._suggest = function() return suggest end
-TM._tabs = { show = ShowTab, current = function() return currentTab end, pages = pages, buttons = tabButtons }
+TM._tabs = { show = function(key) win:ShowTab(key) end, current = function() return win.currentTab end,
+    pages = pages, buttons = tabButtons }

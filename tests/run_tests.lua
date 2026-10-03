@@ -646,8 +646,10 @@ STATE.roles.party2 = "DAMAGER"; STATE.threat.party2 = 0; tick()
 TM.db.aggroSound = false; TM.db.aggroSoundKey = "raidwarning"; TM.db.aggroSoundChannel = "Master"
 
 step("name and look consistency")
--- Every user-facing name is "TauntMaster Forever"
-assertEq(TM.handle.text:GetText(), "TauntMaster Forever", "bar header name")
+-- Every user-facing name is "TauntMaster Forever". The header bar, where room is
+-- tight, shows the logo and "TauntMaster" (the same bar as ToppedOff Forever's).
+assertEq(TM.handle.text:GetText(), "TauntMaster", "bar header name")
+assertEq(TM.handle.logo.__texture, "Interface\\AddOns\\TauntMasterForever\\Media\\logo", "bar header shows the logo")
 local chatLine
 for _, l in ipairs(LOG) do if l:find("TauntMaster") then chatLine = l end end
 assert(chatLine and chatLine:find("TauntMaster Forever"), "chat uses full name: " .. tostring(chatLine))

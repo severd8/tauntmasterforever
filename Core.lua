@@ -8,8 +8,8 @@ local TM = {}
 ns.TM = TM
 _G.TauntMasterForever = TM
 
-local PREFIX = "|cffe8a040TauntMaster Forever|r: "
-local function Print(msg) print(PREFIX .. msg) end
+-- Chat lines start with the logo and name, as in every addon with this look (Theme.lua)
+local function Print(msg) print(ns.Theme.CHAT_PREFIX .. ": " .. msg) end
 TM.Print = Print
 
 -- Forever hands some values to addons as "secret". Comparing or doing math on them errors,
@@ -863,7 +863,7 @@ local function MarkLayer(m, i)
     for n = #m.layers + 1, i do
         local t = m:CreateTexture(nil, "OVERLAY")
         t:SetAllPoints()
-        t:SetTexture(ns.Theme and ns.Theme.LOGO or "Interface\\Icons\\Ability_Physical_Taunt")
+        t:SetTexture(ns.Theme.LOGO)
         t:Hide()
         m.layers[n] = t
     end
@@ -1308,22 +1308,12 @@ function TM:ApplyVisibility()
         RegisterStateDriver(self.partyFrame, "visibility", "[group:raid] hide; show")
         RegisterStateDriver(self.raidFrame, "visibility", db.showInRaid and "[group:raid] show; hide" or "hide")
     end)
-    self:UpdateHeader()
 end
 
--- The header looks the same locked or unlocked (like ToppedOff Forever), and stays
--- visible when locked so its right-click menu is always reachable.
-function TM:UpdateHeader()
-    if not self.handle then return end
-    local C = ns.Theme.C
-    self.handle.text:SetText(ns.Theme.NAME)
-    self.handle.bg:SetColorTexture(unpack(C.red))
-    self.handle.text:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
-end
-
+-- The header looks the same locked or unlocked, and stays visible when locked
+-- so its right-click menu is always reachable.
 function TM:SetLocked(locked)
     self.db.locked = locked
-    self:UpdateHeader()
     Print(locked and "locked." or "unlocked — drag the header to move.")
 end
 
@@ -1357,6 +1347,7 @@ function TM:ApplyFonts()
     local font, _, flags = GameFontNormalSmall:GetFont()
     if self.handle then
         self.handle.text:SetFont(font, self.db.headerFontSize, flags)
+        self.handle:FitLogo(self.db.headerFontSize + 6)
         self:RunOutOfCombat("header", function() self.handle:SetHeight(self.db.headerFontSize + 6) end)
     end
     local tex = self:TexturePath()
@@ -1404,13 +1395,7 @@ function TM:BuildFrames()
     handle:SetPoint("BOTTOMLEFT", main, "TOPLEFT", 0, 2)
     handle:EnableMouse(true)
     handle:RegisterForDrag("LeftButton")
-    handle.bg = handle:CreateTexture(nil, "BACKGROUND")
-    handle.bg:SetAllPoints()
-    ns.Theme.Border(handle, ns.Theme.C.edge)
-    handle.text = handle:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    handle.text:SetPoint("LEFT", 4, 0)
-    handle.text:SetPoint("RIGHT", -4, 0)
-    handle.text:SetWordWrap(false)
+    ns.Theme.HeaderStrip(handle)   -- logo and name, the same bar as ToppedOff Forever's
     handle:SetScript("OnDragStart", function()
         if TM.db.locked or InCombatLockdown() then return end
         main.isMoving = true
@@ -1602,7 +1587,7 @@ function TM:PrintLoadMessage()
         end
         parts[#parts + 1] = name .. " assigned to " .. click.label .. " Click"
     end)
-    local msg = "|cffe8a040TauntMaster Forever|r loaded."
+    local msg = ns.Theme.CHAT_PREFIX .. " loaded."
     if #parts > 0 then
         msg = msg .. " " .. table.concat(parts, ", ") .. "."
     else

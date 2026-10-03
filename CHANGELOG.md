@@ -1,3 +1,11 @@
+## 1.14.0
+
+One look for TauntMaster Forever, ToppedOff Forever and Outfitter Forever.
+
+- The header above the bars now shows the logo beside the name, the same bar ToppedOff Forever has above its icons. The name there is "TauntMaster", so it fits beside the logo on narrow bars.
+- Chat lines from TauntMaster Forever start with the logo.
+- Nothing else changes: the settings window is the one the other two addons now copy.
+
 ## 1.13.3
 
 Under the hood: a code review, with fixes and lighter work in raids. Nothing changes in how the addon looks or is used.

@@ -9,8 +9,8 @@
 ## X-Curse-Project-ID: 1717418
 ## X-Category: Combat
 
+Theme.lua
 Core.lua
 News.lua
-Theme.lua
 Options.lua
 Splash.lua

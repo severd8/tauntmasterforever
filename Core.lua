@@ -35,6 +35,18 @@ TM.KIND_LABELS = {
     target = "Target them",
 }
 
+-- Every bindable click, in menu order: key "shift-1", label "Shift-Left", and the
+-- secure attributes that hold its action
+TM.CLICKS = {}
+for _, mod in ipairs(TM.MODS) do
+    for _, b in ipairs(TM.BUTTONS) do
+        TM.CLICKS[#TM.CLICKS + 1] = { key = mod .. b.id, label = TM.MOD_LABELS[mod] .. b.label,
+            typeAttr = mod .. "type" .. b.id, macroAttr = mod .. "macrotext" .. b.id }
+    end
+end
+TM.SPELL_KINDS = { enemy = true, friend = true, self = true }      -- kinds that cast a named spell
+TM.NO_TEXT_KINDS = { none = true, assist = true, target = true }   -- kinds that need no spell or macro text
+
 local function B(kind, text) return { kind = kind, text = text or "" } end
 
 -- Forever tank kits (verify in-game with /tm check):
@@ -159,16 +171,15 @@ local DEFAULTS = {
     bindings = {},
 }
 
+-- Fills in missing settings. A saved value of the wrong type (a damaged or
+-- hand-edited settings file) is replaced by its default, so nothing later has to
+-- cope with a number where a table should be.
 local function FillDefaults(dst, src)
     for k, v in pairs(src) do
-        if dst[k] == nil then
-            if type(v) == "table" then
-                dst[k] = {}
-                FillDefaults(dst[k], v)
-            else
-                dst[k] = v
-            end
+        if type(dst[k]) ~= type(v) then
+            dst[k] = type(v) == "table" and {} or v
         end
+        if type(v) == "table" then FillDefaults(dst[k], v) end
     end
 end
 
@@ -196,23 +207,27 @@ function TM:GetBindings()
 end
 
 ---------------------------------------------------------------------------
--- Combat-safe queue: protected frames can't be changed in combat
+-- Combat-safe queue: protected frames can't be changed in combat. Work queued
+-- under the same key replaces the earlier request, so a setting changed ten
+-- times during a fight is applied once when it ends.
 ---------------------------------------------------------------------------
-function TM:RunOutOfCombat(fn)
-    if InCombatLockdown() then
-        self.pending = self.pending or {}
-        table.insert(self.pending, fn)
-        return false
+function TM:RunOutOfCombat(key, fn)
+    if not InCombatLockdown() then
+        fn()
+        return true
     end
-    fn()
-    return true
+    self.pending = self.pending or { keys = {}, fns = {} }
+    local p = self.pending
+    if not p.fns[key] then p.keys[#p.keys + 1] = key end
+    p.fns[key] = fn
+    return false
 end
 
 function TM:FlushPending()
-    if not self.pending then return end
-    local list = self.pending
+    local p = self.pending
+    if not p then return end
     self.pending = nil
-    for _, fn in ipairs(list) do fn() end
+    for _, key in ipairs(p.keys) do p.fns[key]() end
 end
 
 ---------------------------------------------------------------------------
@@ -386,7 +401,7 @@ local function PlayAggroSound(force)
     lastAggroSound = now
     local choice = TM.AGGRO_SOUNDS[1]
     for _, s in ipairs(TM.AGGRO_SOUNDS) do
-        if s.key == TM.db.aggroSoundKey then choice = s end
+        if s.key == TM.db.aggroSoundKey then choice = s break end
     end
     local channel = TM.db.aggroSoundChannel or "Master"
     for _, k in ipairs(choice.try) do
@@ -440,12 +455,19 @@ local function BoolAlpha(b, whenTrue, whenFalse, fallback)
     return whenFalse
 end
 
+-- Whether you've learned a spell: true, false, or nil when the game can't say
+local function SpellKnown(spellID)
+    if IsPlayerSpell then return IsPlayerSpell(spellID) end
+    if C_SpellBook and C_SpellBook.IsSpellInSpellBook then return C_SpellBook.IsSpellInSpellBook(spellID) end
+    return nil
+end
+TM.SpellKnown = SpellKnown
+
 local function IsKnownSpell(name)
     local info = TM:GetSpellInfo(name)
     if not info then return false end
-    if IsPlayerSpell then return IsPlayerSpell(info.spellID) end
-    if C_SpellBook and C_SpellBook.IsSpellInSpellBook then return C_SpellBook.IsSpellInSpellBook(info.spellID) end
-    return true
+    if not (IsPlayerSpell or (C_SpellBook and C_SpellBook.IsSpellInSpellBook)) then return true end
+    return SpellKnown(info.spellID)
 end
 
 -- The enemy a click on this bar taunts. With the backup option on, when the
@@ -492,6 +514,31 @@ function TM:RangeState(btn)
     return BoolAlpha(inRange, 1, DIM, 1), 0
 end
 
+-- The health bar. Health may be secret on Forever; widgets accept it, math does not.
+local function SetHealthBar(btn)
+    pcall(btn.bar.SetMinMaxValues, btn.bar, 0, UnitHealthMax(btn.unit))
+    pcall(btn.bar.SetValue, btn.bar, UnitHealth(btn.unit))
+end
+
+-- "Dead" or "Off" for a unit that's down, else nil
+local function DownStatus(unit)
+    local dead = UnitIsDeadOrGhost(unit)
+    local connected = UnitIsConnected(unit)
+    if not IsSecret(dead) and dead then return "Dead" end
+    if not IsSecret(connected) and connected == false then return "Off" end
+    return nil
+end
+
+-- A health change: only the bar and the health % move, unless the unit just
+-- died, went offline or came back (then the whole bar is redrawn)
+function TM:UpdateHealth(btn)
+    if not btn:IsVisible() then return end
+    SetHealthBar(btn)
+    local down = DownStatus(btn.unit)
+    if down ~= btn.down then return self:UpdateButton(btn) end
+    if not down and self.db.healthText then SetHealthText(btn.statusText, btn.unit) end
+end
+
 function TM:UpdateButton(btn)
     if not btn:IsVisible() then return end
     local db = self.db
@@ -507,22 +554,24 @@ function TM:UpdateButton(btn)
         btn.nameText:SetTextColor(1, 1, 1)
     end
 
-    -- Role icon
+    -- Role icon. The name is re-anchored only when the icon appears, changes or goes.
     local role = self:GetRole(unit)
-    btn.nameText:ClearAllPoints()
-    if db.roleIcons and role and ROLE_ATLAS[role] then
-        btn.roleIcon:SetAtlas(ROLE_ATLAS[role])
-        btn.roleIcon:Show()
-        btn.nameText:SetPoint("LEFT", btn.roleIcon, "RIGHT", 2, 0)
-    else
-        btn.roleIcon:Hide()
-        btn.nameText:SetPoint("LEFT", 4, 0)
+    local atlas = db.roleIcons and role and ROLE_ATLAS[role] or nil
+    if atlas ~= btn.roleAtlas then
+        btn.roleAtlas = atlas
+        btn.nameText:ClearAllPoints()
+        if atlas then
+            btn.roleIcon:SetAtlas(atlas)
+            btn.roleIcon:Show()
+            btn.nameText:SetPoint("LEFT", btn.roleIcon, "RIGHT", 2, 0)
+        else
+            btn.roleIcon:Hide()
+            btn.nameText:SetPoint("LEFT", 4, 0)
+        end
+        btn.nameText:SetPoint("RIGHT", -34, 0)
     end
-    btn.nameText:SetPoint("RIGHT", -34, 0)
 
-    -- Health may be secret on Forever; widgets accept it, math does not.
-    pcall(btn.bar.SetMinMaxValues, btn.bar, 0, UnitHealthMax(unit))
-    pcall(btn.bar.SetValue, btn.bar, UnitHealth(unit))
+    SetHealthBar(btn)
 
     -- Range fade (bar only; the secure button itself is never touched in combat).
     -- The alpha may be secret, so it's never truth-tested.
@@ -532,13 +581,10 @@ function TM:UpdateButton(btn)
     pcall(btn.bg.SetAlpha, btn.bg, alpha)
     if not pcall(btn.noTarget.SetAlpha, btn.noTarget, marker) then btn.noTarget:SetAlpha(0) end
 
-    local dead = UnitIsDeadOrGhost(unit)
-    local connected = UnitIsConnected(unit)
-    local isDead = not IsSecret(dead) and dead
-    local isOff = not IsSecret(connected) and connected == false
-    if isDead or isOff then
+    btn.down = DownStatus(unit)
+    if btn.down then
         btn.bar:SetStatusBarColor(0.25, 0.25, 0.25)
-        btn.statusText:SetText(isDead and "Dead" or "Off")
+        btn.statusText:SetText(btn.down)
         btn.noTarget:SetAlpha(0)
         SetFlash(btn, false)
         btn.lastThreat = 0
@@ -641,6 +687,7 @@ local function ManaState(unit)
     return "secret", alpha, pct
 end
 
+-- The other members of your group: raid1..n in a raid, else party1..4
 local function GroupUnits()
     local units = {}
     if IsInRaid() then
@@ -732,15 +779,13 @@ function TM:BuildCooldownIcons()
     end
 end
 
-local CD_KINDS = { enemy = true, self = true, friend = true }
-
 function TM:UpdateCooldowns()
     if not self.cdIcons then return end
     local db = self.db
     local bindings = self:GetBindings()
     for _, b in ipairs(self.cdIcons) do
         local bind = bindings[b.key]
-        local spell = bind and CD_KINDS[bind.kind] and bind.text ~= "" and bind.text
+        local spell = bind and self.SPELL_KINDS[bind.kind] and bind.text ~= "" and bind.text
         local info = spell and C_Spell and C_Spell.GetSpellInfo(spell)
         if not info or not (db.cdShowOnCooldown or db.cdShowWhenReady) then
             b:Hide()
@@ -763,12 +808,13 @@ function TM:UpdateCooldowns()
                 local onGCD = not IsSecret(cd.isOnGCD) and cd.isOnGCD == true
                 if cd.isActive and not onGCD then
                     state = "cd"
-                    if not (C_Spell.GetSpellCooldownDuration and b.cd.SetCooldownFromDurationObject
-                        and pcall(function()
-                            b.cd:SetCooldownFromDurationObject(C_Spell.GetSpellCooldownDuration(info.spellID))
-                        end)) then
-                        pcall(b.cd.SetCooldown, b.cd, cd.startTime, cd.duration)
+                    -- The game's own duration object draws the swipe; hidden times are the fallback
+                    local drawn = false
+                    if C_Spell.GetSpellCooldownDuration and b.cd.SetCooldownFromDurationObject then
+                        local ok, duration = pcall(C_Spell.GetSpellCooldownDuration, info.spellID)
+                        drawn = ok and pcall(b.cd.SetCooldownFromDurationObject, b.cd, duration)
                     end
+                    if not drawn then pcall(b.cd.SetCooldown, b.cd, cd.startTime, cd.duration) end
                 else
                     state = "ready"
                     b.cd:Clear()
@@ -812,15 +858,16 @@ local function PlateMark(plate)
     return m
 end
 
+-- Layers are made in order (1, 2, 3 ...), so the list never has gaps
 local function MarkLayer(m, i)
-    local t = m.layers[i]
-    if not t then
-        t = m:CreateTexture(nil, "OVERLAY")
+    for n = #m.layers + 1, i do
+        local t = m:CreateTexture(nil, "OVERLAY")
         t:SetAllPoints()
         t:SetTexture(ns.Theme and ns.Theme.LOGO or "Interface\\Icons\\Ability_Physical_Taunt")
-        m.layers[i] = t
+        t:Hide()
+        m.layers[n] = t
     end
-    return t
+    return m.layers[i]
 end
 
 local function HideMark(unit)
@@ -831,13 +878,7 @@ end
 -- Group members worth protecting: everyone but you and players marked as tanks
 local function WatchedMembers()
     local list = {}
-    local units = {}
-    if IsInRaid() then
-        for i = 1, GetNumGroupMembers() do units[#units + 1] = "raid" .. i end
-    elseif IsInGroup() then
-        for i = 1, GetNumSubgroupMembers() do units[#units + 1] = "party" .. i end
-    end
-    for _, u in ipairs(units) do
+    for _, u in ipairs(GroupUnits()) do
         local me = UnitIsUnit(u, "player")
         local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(u)
         local isTank = not IsSecret(role) and role == "TANK"
@@ -856,28 +897,28 @@ function TM:UpdatePlateMark(unit, members)
     if (not IsSecret(hostile) and not hostile) or #members == 0 then m:Hide() return end
 
     local mobTarget = unit .. "target"
-    local shownLayers, hidden = 0, false
+    local hidden = false
     for i, u in ipairs(members) do
         local same = UnitIsUnit(mobTarget, u)
         if IsSecret(same) then
             hidden = true
             local layer = MarkLayer(m, i)
-            local a = BoolAlpha(same, 1, 0, 0)
-            if not pcall(layer.SetAlpha, layer, a) then layer:SetAlpha(0) end
+            if not pcall(layer.SetAlpha, layer, BoolAlpha(same, 1, 0, 0)) then layer:SetAlpha(0) end
             layer:Show()
-            shownLayers = i
         elseif same then
             -- Readable: one logo plus who it's hitting
+            local first = MarkLayer(m, 1)
             for j, t in ipairs(m.layers) do t:SetShown(j == 1) end
-            MarkLayer(m, 1):SetAlpha(1)
-            MarkLayer(m, 1):Show()
+            first:SetAlpha(1)
             m.name:SetText(UnitName(u))
             m:Show()
             return
+        elseif m.layers[i] then
+            m.layers[i]:Hide()   -- readable, and not on this member
         end
     end
     if hidden then
-        for j, t in ipairs(m.layers) do if j > shownLayers then t:Hide() end end
+        for j = #members + 1, #m.layers do m.layers[j]:Hide() end
         m.name:SetText("")
         m:Show()
     else
@@ -885,23 +926,21 @@ function TM:UpdatePlateMark(unit, members)
     end
 end
 
-function TM:UpdatePlateMarks()
+-- Every nameplate on screen, or just `only` (one that has just appeared)
+function TM:UpdatePlateMarks(only)
     if not (self.db and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
     local on = self.db.nameplateMarks and (IsInGroup() or IsInRaid())
-    local members = on and WatchedMembers() or {}
-    for unit in pairs(plates) do
-        if on then
-            local ok = pcall(self.UpdatePlateMark, self, unit, members)
-            if not ok then pcall(HideMark, unit) end
-        else
-            pcall(HideMark, unit)
-        end
+    local members = on and WatchedMembers()
+    local function update(unit)
+        if not (on and pcall(self.UpdatePlateMark, self, unit, members)) then pcall(HideMark, unit) end
     end
+    if only then update(only) return end
+    for unit in pairs(plates) do update(unit) end
 end
 
 function TM:OnNamePlateAdded(unit)
     plates[unit] = true
-    pcall(self.UpdatePlateMarks, self)
+    pcall(self.UpdatePlateMarks, self, unit)
 end
 
 function TM:OnNamePlateRemoved(unit)
@@ -1043,47 +1082,29 @@ function TM:BuildMacro(kind, text, unit, enemyUnit, fallback)
     end
 end
 
-function TM:ApplyBindingsToButton(btn, bindings)
-    local fallback = self.db.tauntFallback and not btn.isToT
-    for _, mod in ipairs(self.MODS) do
-        for _, b in ipairs(self.BUTTONS) do
-            local key = mod .. b.id
-            local typeAttr = mod .. "type" .. b.id
-            local macroAttr = mod .. "macrotext" .. b.id
-            btn:SetAttribute(typeAttr, nil)
-            btn:SetAttribute(macroAttr, nil)
-
-            local bind = bindings[key]
-            if bind and bind.kind ~= "none" then
-                if bind.kind == "assist" or bind.kind == "target" then
-                    btn:SetAttribute(typeAttr, bind.kind)
-                elseif bind.text and bind.text ~= "" then
-                    btn:SetAttribute(typeAttr, "macro")
-                    btn:SetAttribute(macroAttr, self:BuildMacro(bind.kind, bind.text, btn.unit,
-                        btn.isToT and "target" or nil, fallback))
-                end
-            end
-        end
+-- Secure attributes for one click: clears the old action, then sets the bound one
+function TM:SetClickAttributes(btn, typeAttr, macroAttr, bind)
+    btn:SetAttribute(typeAttr, nil)
+    btn:SetAttribute(macroAttr, nil)
+    if not bind or bind.kind == "none" then return end
+    if bind.kind == "assist" or bind.kind == "target" then
+        btn:SetAttribute(typeAttr, bind.kind)
+    elseif bind.text and bind.text ~= "" then
+        btn:SetAttribute(typeAttr, "macro")
+        btn:SetAttribute(macroAttr, self:BuildMacro(bind.kind, bind.text, btn.unit,
+            btn.isToT and "target" or nil, self.db.tauntFallback and not btn.isToT))
     end
+end
 
+function TM:ApplyBindingsToButton(btn, bindings)
+    for _, click in ipairs(self.CLICKS) do
+        self:SetClickAttributes(btn, click.typeAttr, click.macroAttr, bindings[click.key])
+    end
     -- Keybindings click with the made-up buttons "TMLeft"/"TMRight". The "*" prefix
     -- matches any modifier, so a controller button bound as e.g. SHIFT-PAD1 still
     -- casts the plain Left/Right Click spell instead of the Shift-click one.
-    for suffix, key in pairs({ ["-tmleft"] = "1", ["-tmright"] = "2" }) do
-        local typeAttr, macroAttr = "*type" .. suffix, "*macrotext" .. suffix
-        btn:SetAttribute(typeAttr, nil)
-        btn:SetAttribute(macroAttr, nil)
-        local bind = bindings[key]
-        if bind and bind.kind ~= "none" then
-            if bind.kind == "assist" or bind.kind == "target" then
-                btn:SetAttribute(typeAttr, bind.kind)
-            elseif bind.text and bind.text ~= "" then
-                btn:SetAttribute(typeAttr, "macro")
-                btn:SetAttribute(macroAttr, self:BuildMacro(bind.kind, bind.text, btn.unit,
-                    btn.isToT and "target" or nil, fallback))
-            end
-        end
-    end
+    self:SetClickAttributes(btn, "*type-tmleft", "*macrotext-tmleft", bindings["1"])
+    self:SetClickAttributes(btn, "*type-tmright", "*macrotext-tmright", bindings["2"])
 end
 
 ---------------------------------------------------------------------------
@@ -1129,7 +1150,7 @@ function TM:UpdateKeyHints()
 end
 
 function TM:ApplyBindings()
-    self:RunOutOfCombat(function()
+    self:RunOutOfCombat("bindings", function()
         local bindings = self:GetBindings()
         for _, btn in ipairs(self.buttons) do
             self:ApplyBindingsToButton(btn, bindings)
@@ -1236,8 +1257,9 @@ function TM:LayoutRaid()
     self.raidFrame:SetSize(1, 1)
 end
 
+-- In combat this waits (once) for the fight to end
 function TM:Layout()
-    self:RunOutOfCombat(function()
+    self:RunOutOfCombat("layout", function()
         self:LayoutGroup(self.partyButtons, self.partyFrame)
         self:LayoutRaid()
         self.main:SetScale(self.db.scale)
@@ -1259,25 +1281,17 @@ function TM:Layout()
     end)
 end
 
--- Queue at most one re-layout while in combat
-function TM:RequestLayout()
-    if InCombatLockdown() then
-        self.layoutPending = true
-    else
-        self:Layout()
-    end
-end
+-- Warrior Defensive Stance = stance 2, Druid Bear Form = form 1
+local TANK_COND = { WARRIOR = "stance:2", DRUID = "form:1" }
 
 function TM:ApplyVisibility()
-    self:RunOutOfCombat(function()
+    self:RunOutOfCombat("visibility", function()
         local db = self.db
         UnregisterStateDriver(self.main, "visibility")
         UnregisterStateDriver(self.partyFrame, "visibility")
         UnregisterStateDriver(self.raidFrame, "visibility")
 
         -- Whole addon (header, icons, warning): hidden entirely, or only when solo
-        -- Warrior Defensive Stance = stance 2, Druid Bear Form = form 1
-        local TANK_COND = { WARRIOR = "stance:2", DRUID = "form:1" }
         local mainCond = "show"
         if not db.shown then
             mainCond = "hide"
@@ -1297,13 +1311,12 @@ function TM:ApplyVisibility()
     self:UpdateHeader()
 end
 
--- Header stays visible when locked so its right-click menu is always reachable.
--- Unlocked: red with gold text (drag to move). Locked: dark with muted text.
+-- The header looks the same locked or unlocked (like ToppedOff Forever), and stays
+-- visible when locked so its right-click menu is always reachable.
 function TM:UpdateHeader()
     if not self.handle then return end
     local C = ns.Theme.C
     self.handle.text:SetText(ns.Theme.NAME)
-    -- Same look locked or unlocked (like ToppedOff Forever); the right-click menu shows the lock
     self.handle.bg:SetColorTexture(unpack(C.red))
     self.handle.text:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
 end
@@ -1344,7 +1357,7 @@ function TM:ApplyFonts()
     local font, _, flags = GameFontNormalSmall:GetFont()
     if self.handle then
         self.handle.text:SetFont(font, self.db.headerFontSize, flags)
-        self:RunOutOfCombat(function() self.handle:SetHeight(self.db.headerFontSize + 6) end)
+        self:RunOutOfCombat("header", function() self.handle:SetHeight(self.db.headerFontSize + 6) end)
     end
     local tex = self:TexturePath()
     local iconSize = math.max(10, math.min(self.db.height - 6, 18))
@@ -1552,56 +1565,43 @@ function TM:Toggle()
     self:SetShown(not self.db.shown)
 end
 
-local function SpellKnown(spellID)
-    if IsPlayerSpell then return IsPlayerSpell(spellID) end
-    if C_SpellBook and C_SpellBook.IsSpellInSpellBook then return C_SpellBook.IsSpellInSpellBook(spellID) end
-    return nil
+-- Calls fn(click, bind) for every click bound to a spell, in menu order
+function TM:EachSpellBinding(fn)
+    local bindings = self:GetBindings()
+    for _, click in ipairs(self.CLICKS) do
+        local bind = bindings[click.key]
+        if bind and self.SPELL_KINDS[bind.kind] and bind.text ~= "" then fn(click, bind) end
+    end
 end
 
 function TM:CheckSpells()
     Print("Checking bound spells for " .. (UnitClass("player")) .. ":")
-    local bindings = self:GetBindings()
     local any = false
-    for _, mod in ipairs(self.MODS) do
-        for _, b in ipairs(self.BUTTONS) do
-            local bind = bindings[mod .. b.id]
-            if bind and (bind.kind == "enemy" or bind.kind == "friend" or bind.kind == "self") and bind.text ~= "" then
-                any = true
-                local label = self.MOD_LABELS[mod] .. b.label
-                local info = self:GetSpellInfo(bind.text)
-                if not info then
-                    print(("  %s: |cffff4040%s — not found. Check spelling or that it exists in Forever.|r"):format(label, bind.text))
-                else
-                    local known = SpellKnown(info.spellID)
-                    if known == false then
-                        print(("  %s: |cffffcc00%s (ID %d) — exists, not learned yet.|r"):format(label, bind.text, info.spellID))
-                    else
-                        print(("  %s: |cff40ff40%s (ID %d) — OK.|r"):format(label, bind.text, info.spellID))
-                    end
-                end
-            end
+    self:EachSpellBinding(function(click, bind)
+        any = true
+        local info = self:GetSpellInfo(bind.text)
+        if not info then
+            print(("  %s: |cffff4040%s — not found. Check spelling or that it exists in Forever.|r"):format(click.label, bind.text))
+        elseif SpellKnown(info.spellID) == false then
+            print(("  %s: |cffffcc00%s (ID %d) — exists, not learned yet.|r"):format(click.label, bind.text, info.spellID))
+        else
+            print(("  %s: |cff40ff40%s (ID %d) — OK.|r"):format(click.label, bind.text, info.spellID))
         end
-    end
+    end)
     if not any then print("  No spells bound. Open /tm spells.") end
 end
 
 -- "TauntMaster Forever loaded. Growl assigned to Left Click, Challenging Roar assigned to Right Click."
 -- Spells the client can't find are flagged in red, so no manual /tm check is needed.
 function TM:PrintLoadMessage()
-    local bindings = self:GetBindings()
     local parts = {}
-    for _, mod in ipairs(self.MODS) do
-        for _, b in ipairs(self.BUTTONS) do
-            local bind = bindings[mod .. b.id]
-            if bind and (bind.kind == "enemy" or bind.kind == "friend" or bind.kind == "self") and bind.text ~= "" then
-                local name = "|cffffd100" .. bind.text .. "|r"
-                if C_Spell and not self:GetSpellInfo(bind.text) then
-                    name = "|cffff4040" .. bind.text .. " (not found)|r"
-                end
-                parts[#parts + 1] = name .. " assigned to " .. self.MOD_LABELS[mod] .. b.label .. " Click"
-            end
+    self:EachSpellBinding(function(click, bind)
+        local name = "|cffffd100" .. bind.text .. "|r"
+        if C_Spell and not self:GetSpellInfo(bind.text) then
+            name = "|cffff4040" .. bind.text .. " (not found)|r"
         end
-    end
+        parts[#parts + 1] = name .. " assigned to " .. click.label .. " Click"
+    end)
     local msg = "|cffe8a040TauntMaster Forever|r loaded."
     if #parts > 0 then
         msg = msg .. " " .. table.concat(parts, ", ") .. "."
@@ -1672,7 +1672,7 @@ SlashCmdList.TAUNTMASTERFOREVER = function(msg)
         end
     elseif msg == "reset" then
         TM.db.point = { "CENTER", "CENTER", -300, 0 }
-        TM:RunOutOfCombat(function() TM:RestorePosition() end)
+        TM:RunOutOfCombat("position", function() TM:RestorePosition() end)
         Print(InCombatLockdown() and "position will reset when combat ends." or "position reset.")
     else
         Help()
@@ -1703,7 +1703,8 @@ events:RegisterEvent("UPDATE_BINDINGS")
 events:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 events:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
 events:SetScript("OnEvent", function(_, event, arg1)
-    if event == "ADDON_LOADED" and arg1 == ADDON then
+    if event == "ADDON_LOADED" then
+        if arg1 ~= ADDON then return end
         TauntMasterForeverDB = TauntMasterForeverDB or {}
         FillDefaults(TauntMasterForeverDB, DEFAULTS)
         TM.db = TauntMasterForeverDB
@@ -1723,29 +1724,31 @@ events:SetScript("OnEvent", function(_, event, arg1)
             TM.db.cdShowWhenReady = false
         end
     elseif event == "PLAYER_LOGIN" then
-        TM:RunOutOfCombat(function() TM:BuildFrames() end)
+        TM:RunOutOfCombat("build", function() TM:BuildFrames() end)
         TM:PrintLoadMessage()
         TM:MaybeShowSplash()
     elseif event == "PLAYER_REGEN_ENABLED" then
         TM:FlushPending()
-        if TM.layoutPending then
-            TM.layoutPending = nil
-            if TM.built then TM:Layout() end
-        end
+    -- Nameplates are tracked from the start, so the ones already up after a
+    -- /reload in combat (when the bars are built late) get their marks too
+    elseif event == "NAME_PLATE_UNIT_ADDED" then
+        TM:OnNamePlateAdded(arg1)
+    elseif event == "NAME_PLATE_UNIT_REMOVED" then
+        TM:OnNamePlateRemoved(arg1)
     elseif not TM.built then
         return
     elseif event == "UPDATE_BINDINGS" then
         TM:UpdateKeyHints()
     elseif event == "SPELL_UPDATE_COOLDOWN" then
         TM:UpdateCooldowns()
-    elseif event == "NAME_PLATE_UNIT_ADDED" then
-        TM:OnNamePlateAdded(arg1)
-    elseif event == "NAME_PLATE_UNIT_REMOVED" then
-        TM:OnNamePlateRemoved(arg1)
     elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED" then
-        if TM.db.sortByRole or IsInRaid() then TM:RequestLayout() end
+        if TM.db.sortByRole or IsInRaid() then TM:Layout() end
         TM:RefreshAll()
     elseif arg1 and TM.unitToButton[arg1] then
-        TM:UpdateButton(TM.unitToButton[arg1])
+        if event == "UNIT_THREAT_SITUATION_UPDATE" then
+            TM:UpdateButton(TM.unitToButton[arg1])
+        else
+            TM:UpdateHealth(TM.unitToButton[arg1])   -- UNIT_HEALTH, UNIT_MAXHEALTH
+        end
     end
 end)

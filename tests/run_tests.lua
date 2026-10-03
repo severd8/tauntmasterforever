@@ -165,7 +165,7 @@ assertEq(TM.totButton.__pos[2], 58, "target's-target bar moves above bigger icon
 -- Resizing in combat: icons update right away, protected bar waits
 COMBAT = true; BLOCKED = {}
 TM.db.cdIconSize = 20
-TM:ApplyFonts(); TM:RequestLayout()
+TM:ApplyFonts(); TM:Layout()
 assertEq(TM.cdIcons[1].__size[1], 20, "icons resize in combat")
 assertEq(#BLOCKED, 0, "nothing protected touched in combat")
 COMBAT = false; fire("PLAYER_REGEN_ENABLED")
@@ -235,10 +235,28 @@ popup.GetEditBox = function() return eb end
 StaticPopupDialogs.TAUNTMASTERFOREVER_CUSTOM.OnAccept(popup, "1")
 assertEq(TM:GetBindings()["1"].text, "Taunt", "custom spell trimmed and saved")
 TM.db.bindings.DRUID = TM:DefaultBindings(); TM:ApplyBindings()
+-- A class with a utility spell lists it under its own heading, after the taunts
+STATE.class = "PALADIN"; MENUS = {}
+TauntMasterForeverConfig.__scripts.OnShow(TauntMasterForeverConfig)
+walk(win, function(f) if f.__kind == "Button" and f.__text == "Judgement" then f.__scripts.OnClick(f) end end)
+local order = {}
+for _, e in ipairs(MENUS[#MENUS].entries) do
+    order[#order + 1] = e.kind .. ":" .. tostring(e.text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t ", "")
+end
+assertEq(table.concat(order, " / "), "title:Taunt abilities / radio:Judgement (needs Seal of Fury) not found / divider: / "
+    .. "title:Utility / radio:Blessing of Protection not found / divider: / button:Custom spell... / button:Target them / button:None",
+    "paladin spell menu")
+STATE.class = "DRUID"; MENUS = {}
+TauntMasterForeverConfig.__scripts.OnShow(TauntMasterForeverConfig)
 
 step("click bindings: validation and autocomplete")
 TM:OpenConfig("spells")
 local rows = TM._spellRows
+for _, row in ipairs(rows) do
+    local needsText = row.kind == "enemy" or row.kind == "friend" or row.kind == "self" or row.kind == "macro"
+    assertEq(row.edit.__enabled, needsText, row.label .. ": text box is usable only for spells and macros")
+end
+assertEq(rows[1].kind, "enemy", "Left click casts a spell"); assertEq(rows[3].kind, "target", "Middle click targets")
 local left = rows[1]                      -- Left click, bound to Growl (enemy)
 local function type_(row, text) row.edit:SetText(text); row.edit.__scripts.OnTextChanged(row.edit, true) end
 left.edit.__scripts.OnEditFocusGained(left.edit)   -- focusing a box loads your spellbook
@@ -718,6 +736,21 @@ assertEq(cdShown(true, false, false, false), false, "ready: hidden with Show on 
 assertEq(cdShown(false, true, false, false), true, "ready: shown with Show when ready")
 assertEq(cdShown(false, true, true, false), false, "on cooldown: hidden with Show when ready")
 assertEq(cdShown(false, true, true, true), true, "global cooldown counts as ready")
+-- The swipe is drawn from the game's own duration object, or from the hidden times
+local swipes = {}
+icon.cd.SetCooldown = function() swipes[#swipes + 1] = "times" end
+assertEq(cdShown(true, false, true, false), true, "on cooldown")
+assertEq(table.concat(swipes, ","), "times", "no duration object: the hidden times are handed to the swipe")
+swipes = {}
+C_Spell.GetSpellCooldownDuration = function(id) return { id = id } end
+icon.cd.SetCooldownFromDurationObject = function(_, d) swipes[#swipes + 1] = "object" .. tostring(d.id) end
+cdShown(true, false, true, false)
+assertEq(swipes[1] and swipes[1]:match("^object%d+$") and #swipes, 1, "the duration object is used when the game has one")
+swipes = {}
+icon.cd.SetCooldownFromDurationObject = function() error("not this time") end
+cdShown(true, false, true, false)
+assertEq(table.concat(swipes, ","), "times", "and the times are the fallback if it fails")
+C_Spell.GetSpellCooldownDuration, icon.cd.SetCooldownFromDurationObject, icon.cd.SetCooldown = nil, nil, nil
 CD_ACTIVE, CD_GCD = nil, nil
 TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady = true, false
 SECRET_MODE = true; SlashCmdList.TAUNTMASTERFOREVER("debug"); SECRET_MODE = false
@@ -792,4 +825,142 @@ played = nil
 for _, l in ipairs(LOG) do if l:find("^SOUND") then played = l end end
 assertEq(played, "SOUND 12197 " .. TM.db.aggroSoundChannel, "boss emote warning used when it exists")
 TM.db.aggroSoundKey = "raidwarning"
+
+step("settings changed in combat are applied once, when it ends")
+local layouts, binds = 0, 0
+local realLayoutGroup, realApplyToButton = TM.LayoutGroup, TM.ApplyBindingsToButton
+TM.LayoutGroup = function(...) layouts = layouts + 1 return realLayoutGroup(...) end
+TM.ApplyBindingsToButton = function(...) binds = binds + 1 return realApplyToButton(...) end
+COMBAT = true; BLOCKED = {}
+for n = 1, 25 do TM.db.width = 100 + n; TM:ApplySettings() end
+SlashCmdList.TAUNTMASTERFOREVER("reset"); SlashCmdList.TAUNTMASTERFOREVER("reset")
+assertEq(layouts, 0, "nothing is laid out in combat")
+assertEq(#BLOCKED, 0, "no protected frame touched in combat: " .. table.concat(BLOCKED, ", "))
+COMBAT = false
+fire("PLAYER_REGEN_ENABLED")
+assertEq(layouts, 1, "one layout for 25 changes")
+assertEq(binds, #TM.buttons + 1, "bindings applied once to each bar (and the targeted-ally button)")
+assertEq(TM.unitToButton.party1.__size[1], 125, "with the last value")
+assertEq(TM.pending, nil, "nothing left waiting")
+fire("PLAYER_REGEN_ENABLED")
+assertEq(layouts, 1, "and it isn't run again")
+TM.LayoutGroup, TM.ApplyBindingsToButton = realLayoutGroup, realApplyToButton
+TM.db.width = 120; TM:ApplySettings()
+
+step("health changes update the bar and health % only")
+local realDead, realConnected = UnitIsDeadOrGhost, UnitIsConnected
+local dead, offline = {}, {}
+UnitIsDeadOrGhost = function(u) return dead[u] == true end
+UnitIsConnected = function(u) return not offline[u] end
+TM.db.healthText = true; TM.db.aggroSound = true; TM.db.aggroSoundLevel = 2
+STATE.inGroup, STATE.party, STATE.roles, STATE.threat = true, 2, {}, {}
+local hb = TM.unitToButton.party1
+tick()
+assertEq(hb.statusText.__text, "50%", "health % shown")
+local updates = 0
+local realUpdateButton = TM.UpdateButton
+TM.UpdateButton = function(...) updates = updates + 1 return realUpdateButton(...) end
+hb.statusText.__text = "stale"
+fire("UNIT_HEALTH", "party1")
+assertEq(hb.statusText.__text, "50%", "a health change refreshes the health %")
+assertEq(updates, 0, "without redrawing the whole bar")
+fire("UNIT_HEALTH", "nameplate7")
+assertEq(updates, 0, "units without a bar are ignored")
+STATE.threat.party1 = 3; LOG = {}; FAKE_TIME = FAKE_TIME + 5
+fire("UNIT_HEALTH", "party1")
+local sounded = false
+for _, l in ipairs(LOG) do if l:find("^SOUND") then sounded = true end end
+assertEq(sounded, false, "a health change alone doesn't play the aggro sound")
+fire("UNIT_THREAT_SITUATION_UPDATE", "party1")
+assertEq(updates, 1, "a threat change redraws the bar")
+for _, l in ipairs(LOG) do if l:find("^SOUND") then sounded = true end end
+assertEq(sounded, true, "and plays the aggro sound")
+STATE.threat = {}; tick(); updates = 0
+dead.party1 = true
+fire("UNIT_HEALTH", "party1")
+assertEq(hb.statusText.__text, "Dead", "dying shows Dead at once")
+assertEq(updates, 1, "by redrawing the bar")
+fire("UNIT_HEALTH", "party1")
+assertEq(updates, 1, "still dead: nothing more to redraw")
+assertEq(hb.statusText.__text, "Dead", "and Dead stays")
+dead.party1 = nil
+fire("UNIT_MAXHEALTH", "party1")
+assertEq(hb.statusText.__text, "50%", "coming back shows health again")
+assertEq(updates, 2, "by redrawing the bar")
+offline.party1 = true
+fire("UNIT_HEALTH", "party1")
+assertEq(hb.statusText.__text, "Off", "going offline shows Off")
+offline.party1 = nil; tick()
+TM.db.healthText = false
+hb.statusText.__text = "stale"
+fire("UNIT_HEALTH", "party1")
+assertEq(hb.statusText.__text, "stale", "aggro words are left to the threat updates")
+TM.UpdateButton = realUpdateButton
+UnitIsDeadOrGhost, UnitIsConnected = realDead, realConnected
+TM.db.aggroSound = false
+tick()
+
+step("a role icon moves the name only when it changes")
+local nameMoves = 0
+local nameText = TM.unitToButton.party1.nameText
+local realClear = nameText.ClearAllPoints
+nameText.ClearAllPoints = function(...) nameMoves = nameMoves + 1 return realClear(...) end
+STATE.roles.party1 = "HEALER"; TM.db.roleIcons = true
+tick(); tick(); tick()
+assertEq(nameMoves, 1, "moved once when the icon appeared")
+assertEq(TM.unitToButton.party1.roleIcon.__shown, true, "icon shown")
+STATE.roles.party1 = "TANK"; tick(); tick()
+assertEq(nameMoves, 2, "and once when the role changed")
+TM.db.roleIcons = false; tick(); tick()
+assertEq(nameMoves, 3, "and once when icons were turned off")
+assertEq(TM.unitToButton.party1.roleIcon.__shown, false, "icon hidden")
+nameText.ClearAllPoints = nil
+STATE.roles = {}; TM.db.roleIcons = true; tick()
+
+step("nameplates that appear before the bars are built are still marked")
+STATE.inGroup, STATE.inRaid, STATE.party = true, false, 2
+TM.built = false   -- as after a /reload in the middle of a fight
+fire("NAME_PLATE_UNIT_ADDED", "nameplate9")
+TM.built = true
+MOB_TARGET = { nameplate9 = "party1" }
+TM:UpdatePlateMarks()
+assertEq(PLATES.nameplate9.tmForeverMark.__shown, true, "marked once the bars exist")
+-- One member's answer hidden, another's readable: no stale logo is left showing
+SECRET_MODE = true; local hiddenFalse = UnitExists("nobody"); SECRET_MODE = false
+local realUnitIsUnit = UnitIsUnit
+UnitIsUnit = function(a, b)
+    if a == "nameplate9target" and b == "party2" then return hiddenFalse end
+    if a == "nameplate9target" then return false end
+    return realUnitIsUnit(a, b)
+end
+TM:UpdatePlateMarks()
+local mark9 = PLATES.nameplate9.tmForeverMark
+assertEq(mark9.__shown, true, "mixed answers: the mark frame shows, the game sets the alpha")
+assertEq(mark9.layers[1].__shown, false, "the layer for the member it's known not to be on is hidden")
+assertEq(mark9.layers[2].__shown, true, "the layer for the hidden answer is shown")
+UnitIsUnit = realUnitIsUnit
+fire("NAME_PLATE_UNIT_REMOVED", "nameplate9")
+MOB_TARGET = {}
+
+step("a damaged settings file falls back to defaults")
+local saved = { point = TM.db.point, width = TM.db.width, classColors = TM.db.classColors }
+TauntMasterForeverDB.point = "middle"
+TauntMasterForeverDB.width = "wide"
+TauntMasterForeverDB.classColors = 1
+TauntMasterForeverDB.bindings = false
+fire("ADDON_LOADED", ADDON)
+assertEq(type(TM.db.point), "table", "position is a table again")
+assertEq(TM.db.point[1], "CENTER", "default anchor")
+assertEq(TM.db.point[3], -300, "default offset")
+assertEq(TM.db.width, 120, "default width")
+assertEq(TM.db.classColors, true, "default switch")
+assertEq(type(TM.db.bindings), "table", "bindings table")
+TM.db.point = { "TOPLEFT", "BOTTOMLEFT" }   -- half a position
+fire("ADDON_LOADED", ADDON)
+assertEq(TM.db.point[1], "TOPLEFT", "what's valid is kept")
+assertEq(TM.db.point[4], 0, "what's missing is filled in")
+TM:ApplySettings(); SlashCmdList.TAUNTMASTERFOREVER("reset")
+assertEq(TM.unitToButton.party1.__attrs.macrotext1, "/cast [@party1target,harm,nodead] Growl", "default bindings are back")
+TM.db.width, TM.db.classColors = saved.width, saved.classColors
+TM:ApplySettings()
 print("ALL TESTS PASSED")

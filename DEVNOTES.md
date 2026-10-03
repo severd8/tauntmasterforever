@@ -29,11 +29,14 @@ Forever runs the modern (Midnight 12.x-style) addon API, not the Classic one.
   - Always check `IsSecret(v)` **before** any `== nil`, comparison, `and`/`or` test or arithmetic on an API result.
   - Secrets can be passed straight into widgets (`SetText`, `SetFormattedText`, `SetValue`, `SetMinMaxValues`, `SetAlpha`, `SetCooldown`), usually inside `pcall`.
   - The low mana warning uses `UnitPowerPercent` with a step curve from `C_CurveUtil.CreateCurve()` so the game decides visibility.
-- **Combat lockdown.** Protected (secure) frames can't be moved, resized, shown/hidden or have attributes changed in combat. Use `TM:RunOutOfCombat(fn)` or `TM:RequestLayout()`. The header (`TM.handle`) and main frame count as protected because secure bars are anchored to them.
+- **Combat lockdown.** Protected (secure) frames can't be moved, resized, shown/hidden or have attributes changed in combat. Use `TM:RunOutOfCombat(key, fn)`: out of combat it runs `fn` at once; in combat it keeps one `fn` per key (a later request with the same key replaces the earlier one), and they run when combat ends. `TM:Layout()`, `TM:ApplyVisibility()` and `TM:ApplyBindings()` already go through it, so call them freely. The header (`TM.handle`) and main frame count as protected because secure bars are anchored to them.
 - **No automation.** Every taunt must come from the player's click. Never auto-taunt or auto-target.
 - **Missing APIs seen on Forever:** `Slider:SetObeyStepsOnDrag` doesn't exist (guard with `if s.SetObeyStepsOnDrag`). Guard any newer API the same way.
 - Taunt announcements are sent from Lua, not the click macro: a bar's `PreClick` hook records the clicked binding's spell (`TM:OnBarClick`), and `UNIT_SPELLCAST_SUCCEEDED` for the player sends the message if that spell succeeds within 1.5 seconds (`TM:OnSpellCastSucceeded`). Uses `C_ChatInfo.SendChatMessage` (falls back to `SendChatMessage`) inside `pcall`.
 - Tank stance conditions: Warrior Defensive Stance = `[stance:2]`, Druid Bear Form = `[form:1]` (confirmed in game). Paladins have no stance; their taunt is Judgement with Seal of Fury.
+- **One list of clicks.** `TM.CLICKS` holds every bindable click (key, label, secure attribute names). The options rows, `/tm check`, the load message and `TM:ApplyBindingsToButton` all walk it; `TM:EachSpellBinding(fn)` visits the ones bound to a spell. `TM.SPELL_KINDS` and `TM.NO_TEXT_KINDS` say which kinds cast a named spell and which need no text.
+- **Refreshing a bar.** `TM:UpdateButton` redraws everything (every quarter second from the ticker, on threat changes, and when a bar appears). `UNIT_HEALTH` / `UNIT_MAXHEALTH` only run `TM:UpdateHealth`: the bar and the health %, plus a full redraw when the unit has just died, gone offline or come back (`btn.down`). The name is re-anchored only when the role icon changes (`btn.roleAtlas`).
+- **Saved settings** are checked on load: a value whose type doesn't match its default is replaced by the default (`FillDefaults`).
 
 ## Testing
 

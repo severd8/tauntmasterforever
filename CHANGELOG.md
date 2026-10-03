@@ -1,3 +1,13 @@
+## 1.13.3
+
+Under the hood: a code review, with fixes and lighter work in raids. Nothing changes in how the addon looks or is used.
+
+- Fixed: changing settings during a fight queued every change, and all of them were re-applied one after another when the fight ended. Each kind of change is now applied once, with the latest values.
+- Fixed: after a `/reload` in the middle of a fight, enemies whose nameplates were already up got no nameplate marks until they left the screen and came back.
+- Fixed: a nameplate mark could keep showing a stale logo when the game hid the answer for some group members and not for others.
+- A damaged settings file (a setting of the wrong kind) no longer stops the bars from loading; the damaged setting goes back to its default.
+- Lighter in raids: a health change now only updates that bar's health, and a nameplate appearing only updates that nameplate.
+
 ## 1.13.2
 
 - The Alerts tab explains that you target the marked mob, then taunt it (the mark itself isn't clickable).

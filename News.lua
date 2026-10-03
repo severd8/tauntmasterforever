@@ -6,6 +6,9 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.13.3", date = "2026-10-03", items = {
+        "Fixes for settings changed during a fight and for nameplate marks after a /reload in combat. Lighter in raids.",
+    } },
     { version = "1.13.2", date = "2026-10-01", items = {
         "Clearer option text for nameplate marks and /tm reset.",
     } },

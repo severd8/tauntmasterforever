@@ -8,13 +8,20 @@ local function AddRefresher(fn) table.insert(refreshers, fn) end
 local function RunRefreshers() for _, fn in ipairs(refreshers) do fn() end end
 
 ---------------------------------------------------------------------------
--- Widget helpers
----------------------------------------------------------------------------
----------------------------------------------------------------------------
--- Shared look (Theme.lua)
+-- Widget helpers, in the shared look (Theme.lua)
 ---------------------------------------------------------------------------
 local T = ns.Theme
 local C, Fill, Border, Text, FlatButton = T.C, T.Fill, T.Border, T.Text, T.FlatButton
+local SpellKnown, SPELL_KINDS = TM.SpellKnown, TM.SPELL_KINDS
+
+-- The small gold arrow at the right of anything that opens a menu
+local function MenuArrow(button, inset)
+    local arrow = button:CreateTexture(nil, "OVERLAY")
+    arrow:SetSize(12, 12)
+    arrow:SetPoint("RIGHT", -inset, 0)
+    arrow:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
+    arrow:SetVertexColor(0.91, 0.63, 0.25)
+end
 
 -- Card: a panel with a small orange uppercase title. Content starts at y = -28.
 local function Card(parent, title, x, y, w, h)
@@ -83,11 +90,7 @@ local function Dropdown(parent, width, keys, labels, getter, setter)
     fs:SetPoint("LEFT", 8, 0)
     fs:SetPoint("RIGHT", -20, 0)
     b:SetFontString(fs)
-    local arrow = b:CreateTexture(nil, "OVERLAY")
-    arrow:SetSize(12, 12)
-    arrow:SetPoint("RIGHT", -6, 0)
-    arrow:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
-    arrow:SetVertexColor(0.91, 0.63, 0.25)
+    MenuArrow(b, 6)
 
     local function label(k) return labels[k] or tostring(k) end
     local function refresh() b:SetText(label(getter())) end
@@ -154,7 +157,7 @@ local function FlatSlider(parent, text, x, y, width, key, min, max, suffix, onCh
                 onChange()
             else
                 TM:ApplyFonts()
-                TM:RequestLayout()
+                TM:Layout()
             end
         end
     end)
@@ -182,12 +185,6 @@ end
 ---------------------------------------------------------------------------
 -- Spell picker (Left / Right Click Spell)
 ---------------------------------------------------------------------------
-local function SpellKnown(spellID)
-    if IsPlayerSpell then return IsPlayerSpell(spellID) end
-    if C_SpellBook and C_SpellBook.IsSpellInSpellBook then return C_SpellBook.IsSpellInSpellBook(spellID) end
-    return nil
-end
-
 local function SpellLabel(s)
     local info = TM:GetSpellInfo(s.name)
     local icon = info and info.iconID and ("|T" .. info.iconID .. ":16:16:0:0|t ") or ""
@@ -204,8 +201,6 @@ end
 ---------------------------------------------------------------------------
 -- Spell name validation and autocomplete
 ---------------------------------------------------------------------------
-local SPELL_KINDS = { enemy = true, friend = true, self = true }
-
 -- Returns "ok", "unlearned" or "missing" (nil if the box is empty), plus the
 -- game's exact spelling of the name when it was found.
 local function ValidateSpell(text)
@@ -341,27 +336,27 @@ local function ShowSpellMenu(owner, key)
     end
 
     MenuUtil.CreateContextMenu(owner, function(_, root)
-        root:CreateTitle("Taunt abilities")
-        local hasUtility = false
-        for _, s in ipairs(spells) do
-            if s.utility then
-                hasUtility = true
-            else
-                root:CreateRadio(SpellLabel(s), function() return isSelected(s) end, function() choose(s) end)
-            end
-        end
-        if #spells == 0 then
-            root:CreateTitle("|cff999999No taunts for your class|r")
-        end
-        if hasUtility then
-            root:CreateDivider()
-            root:CreateTitle("Utility")
+        -- Radio buttons for the taunts, or for the utility spells; true if there were any
+        local function radios(utility)
+            local any = false
             for _, s in ipairs(spells) do
-                if s.utility then
+                if (s.utility or false) == utility then
+                    if utility and not any then
+                        root:CreateDivider()
+                        root:CreateTitle("Utility")
+                    end
+                    any = true
                     root:CreateRadio(SpellLabel(s), function() return isSelected(s) end, function() choose(s) end)
                 end
             end
+            return any
         end
+        root:CreateTitle("Taunt abilities")
+        radios(false)
+        if #spells == 0 then
+            root:CreateTitle("|cff999999No taunts for your class|r")
+        end
+        radios(true)
         root:CreateDivider()
         root:CreateButton("Custom spell...", function()
             StaticPopup_Show("TAUNTMASTERFOREVER_CUSTOM", nil, nil, key)
@@ -404,6 +399,14 @@ local function StatusIcon(parent)
     f:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f:Hide()
     return f
+end
+
+-- Assist, Target and Nothing need no spell or macro: their text box is greyed out
+local function SetRowKind(row, kind)
+    row.kind = kind
+    local needsText = not TM.NO_TEXT_KINDS[kind]
+    row.edit:SetEnabled(needsText)
+    row.edit:SetAlpha(needsText and 1 or 0.4)
 end
 
 local function UpdateRowStatus(row)
@@ -590,12 +593,9 @@ local function RefreshSpellRows()
     local bindings = TM:GetBindings()
     for _, row in ipairs(spellRows) do
         local bind = bindings[row.key]
-        row.kind = bind and bind.kind or "none"
+        SetRowKind(row, bind and bind.kind or "none")
         row.edit:SetText(bind and bind.text or "")
         row.cycle.Refresh()
-        local needsText = not (row.kind == "none" or row.kind == "assist" or row.kind == "target")
-        row.edit:SetEnabled(needsText)
-        row.edit:SetAlpha(needsText and 1 or 0.4)
         UpdateRowStatus(row)
     end
     HideSuggest()
@@ -628,30 +628,24 @@ local function BuildBindingsSection(page, top)
     Text(page, "SPELL NAME OR MACRO  ({unit} = the player)", "GameFontNormalSmall", C.orange):SetPoint("TOPLEFT", 280, top)
 
     local y = top - 18
-    for _, mod in ipairs(TM.MODS) do
-        for _, b in ipairs(TM.BUTTONS) do
-            local row = { key = mod .. b.id, kind = "none", label = TM.MOD_LABELS[mod] .. b.label }
-            RowLabel(page, TM.MOD_LABELS[mod] .. b.label, 0, y)
-            row.cycle = Dropdown(page, 172, TM.KINDS, TM.KIND_LABELS,
-                function() return row.kind end,
-                function(v)
-                    row.kind = v
-                    local needsText = not (v == "none" or v == "assist" or v == "target")
-                    row.edit:SetEnabled(needsText)
-                    row.edit:SetAlpha(needsText and 1 or 0.4)
-                    UpdateRowStatus(row)
-                    HideSuggest()
-                end)
-            row.cycle:SetPoint("TOPLEFT", 96, y)
-            row.page = page
-            row.edit = FlatEditBox(page, 200)
-            row.edit:SetPoint("TOPLEFT", 280, y)
-            row.status = StatusIcon(page)
-            row.status:SetPoint("LEFT", row.edit, "RIGHT", 6, 0)
-            WireSpellBox(row)
-            table.insert(spellRows, row)
-            y = y - 25
-        end
+    for _, click in ipairs(TM.CLICKS) do
+        local row = { key = click.key, kind = "none", label = click.label, page = page }
+        RowLabel(page, click.label, 0, y)
+        row.cycle = Dropdown(page, 172, TM.KINDS, TM.KIND_LABELS,
+            function() return row.kind end,
+            function(v)
+                SetRowKind(row, v)
+                UpdateRowStatus(row)
+                HideSuggest()
+            end)
+        row.cycle:SetPoint("TOPLEFT", 96, y)
+        row.edit = FlatEditBox(page, 200)
+        row.edit:SetPoint("TOPLEFT", 280, y)
+        row.status = StatusIcon(page)
+        row.status:SetPoint("LEFT", row.edit, "RIGHT", 6, 0)
+        WireSpellBox(row)
+        table.insert(spellRows, row)
+        y = y - 25
     end
 
     local save = FlatButton(page, "Save", 100)
@@ -703,11 +697,7 @@ local function SpellSelector(parent, x, y, w, key)
     fs:SetPoint("LEFT", icon, "RIGHT", 8, 0)
     fs:SetPoint("RIGHT", -20, 0)
     b:SetFontString(fs)
-    local arrow = b:CreateTexture(nil, "OVERLAY")
-    arrow:SetSize(12, 12)
-    arrow:SetPoint("RIGHT", -8, 0)
-    arrow:SetTexture("Interface\\Buttons\\Arrow-Down-Up")
-    arrow:SetVertexColor(0.91, 0.63, 0.25)
+    MenuArrow(b, 8)
     b:SetScript("OnClick", function(self) ShowSpellMenu(self, key) end)
     AddRefresher(function()
         b:SetText(BindingText(key))
@@ -749,10 +739,6 @@ local function BuildTauntsTab(p)
     Switch(more, "Backup taunt when they have no enemy targeted", 12, -76, "tauntFallback")
     MutedNote(more, "If they're targeting a friend (like a healer targeting who they heal), "
         .. "taunts what that friend is fighting instead. Not always the mob that's on them.", 50, -98, PAGE_W - 62)
-end
-
-local function BuildBindingsTab(p)
-    BuildBindingsSection(p, 0)
 end
 
 local function BuildLayoutTab(p)
@@ -874,7 +860,7 @@ end
 
 local TABS = {
     { key = "taunts",     label = "Taunts",         icon = "Interface\\Icons\\Ability_Physical_Taunt",     build = BuildTauntsTab },
-    { key = "bindings",   label = "Click Bindings", icon = "Interface\\Icons\\INV_Misc_Note_01",           build = BuildBindingsTab },
+    { key = "bindings",   label = "Click Bindings", icon = "Interface\\Icons\\INV_Misc_Note_01",           build = function(p) BuildBindingsSection(p, 0) end },
     { key = "layout",     label = "Layout",         icon = "Interface\\Icons\\INV_Misc_Spyglass_03",       build = BuildLayoutTab },
     { key = "appearance", label = "Appearance",     icon = "Interface\\Icons\\INV_Fabric_Silk_02",         build = BuildAppearanceTab },
     { key = "alerts",     label = "Alerts",         icon = "Interface\\Icons\\Ability_Warrior_BattleShout", build = BuildAlertsTab },

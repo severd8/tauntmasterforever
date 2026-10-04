@@ -116,6 +116,7 @@ function Methods:RegisterEvent(e) self.__events = self.__events or {} self.__eve
 function Methods:RegisterUnitEvent(e) self.__events = self.__events or {} self.__events[e] = true end
 function Methods:SetAlpha(a) self.__alpha = a end
 function Methods:SetTexture(t) self.__texture = t end
+function Methods:SetTexCoord(...) self.__texcoord = { ... } end
 function Methods:SetFontString(fs) self.__fs = fs end
 function Methods:GetFontString() return self.__fs end
 function Methods:SetEnabled(v) self.__enabled = v end

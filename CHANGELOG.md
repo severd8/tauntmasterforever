@@ -1,3 +1,7 @@
+## 1.14.1
+
+- **New logo**: the shield in a gold ring, matching ToppedOff Forever, Outfitter Forever and BattleText Forever. It's the same everywhere the logo shows: the bar header, the settings window, chat lines, the minimap button, the welcome window, nameplate marks and the AddOns list.
+
 ## 1.14.0
 
 One look for TauntMaster Forever, ToppedOff Forever and Outfitter Forever.

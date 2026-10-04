@@ -1484,11 +1484,12 @@ function TM:BuildMinimapButton()
     b:RegisterForDrag("LeftButton")
     b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
+    -- The round logo, whole, inside the button's ring (as in ToppedOff Forever)
     local icon = b:CreateTexture(nil, "BACKGROUND")
-    icon:SetSize(20, 20)
+    icon:SetSize(22, 22)
     icon:SetTexture(ns.Theme.LOGO)
-    icon:SetTexCoord(0.06, 0.94, 0.06, 0.94)
-    icon:SetPoint("TOPLEFT", 7, -5)
+    icon:SetPoint("TOPLEFT", 5, -4)
+    b.icon = icon
 
     local border = b:CreateTexture(nil, "OVERLAY")
     border:SetSize(53, 53)

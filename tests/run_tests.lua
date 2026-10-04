@@ -684,6 +684,20 @@ end
 SECRET_MODE = true; SlashCmdList.TAUNTMASTERFOREVER("debug"); SECRET_MODE = false
 
 step("minimap")
+assertEq(TM.minimapButton.icon.__texture, "Interface\\AddOns\\TauntMasterForever\\Media\\logo", "the minimap button shows the logo")
+assertEq(TM.minimapButton.icon.__texcoord, nil, "whole (it's round: nothing to trim)")
+-- The logo file itself: what the game can load (an uncompressed 32-bit TGA, 128x128), and round
+do
+    local f = assert(io.open(ADDON_DIR .. "/Media/logo.tga", "rb"), "the logo file")
+    local data = f:read("*a") f:close()
+    assertEq(data:byte(3), 2, "uncompressed true-color TGA")
+    assertEq(data:byte(13) + data:byte(14) * 256, 128, "128 wide")
+    assertEq(data:byte(15) + data:byte(16) * 256, 128, "128 tall")
+    assertEq(data:byte(17), 32, "32-bit, with transparency")
+    assertEq(data:byte(18 + 4), 0, "its corner is see-through (a round logo, not a square one)")
+    local pkg = io.open(ADDON_DIR .. "/.pkgmeta"):read("*a")
+    assert(pkg:find("\n  %- art\n"), "the logo's sources aren't shipped")
+end
 TM.minimapButton.__scripts.OnClick(TM.minimapButton, "LeftButton")
 TM.minimapButton.__scripts.OnClick(TM.minimapButton, "RightButton")
 TM.minimapButton.__scripts.OnDragStart(TM.minimapButton)

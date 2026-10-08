@@ -6,6 +6,9 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.14.2", date = "2026-10-06", items = {
+        "New logo on the CurseForge page. Nothing changes in the game.",
+    } },
     { version = "1.14.1", date = "2026-10-04", items = {
         "New logo: the shield in a gold ring, like the other Forever addons.",
     } },

@@ -23,7 +23,7 @@ jobs:
       CF_API_KEY: ${{ secrets.CF_API_KEY }}
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0   # full history, so the packager can find tags and build a changelog
 

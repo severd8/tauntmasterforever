@@ -6,7 +6,6 @@
 local ADDON, ns = ...
 local TM = {}
 ns.TM = TM
-_G.TauntMasterForever = TM
 
 -- Chat lines start with the logo and name, as in every addon with this look (Theme.lua)
 local function Print(msg) print(ns.Theme.CHAT_PREFIX .. ": " .. msg) end

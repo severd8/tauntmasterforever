@@ -1,7 +1,8 @@
 -- The shared look of severd8's WoW: Forever addons: flat dark panels, gold text,
 -- red accents, the logo header bar, and the settings window with tabs down the
--- left. This same file ships in TauntMaster Forever, ToppedOff Forever and
--- Outfitter Forever. Change it in one, then copy it to the others.
+-- left. This same file ships in TauntMaster Forever, ToppedOff Forever,
+-- Outfitter Forever and BattleText Forever. Change it in one, then copy it to
+-- the others.
 
 local ADDON, ns = ...
 local T = {}
@@ -12,6 +13,7 @@ local BRANDS = {
     TauntMasterForever = { name = "TauntMaster Forever", short = "TauntMaster", logo = "Media\\logo" },
     ToppedOffForever   = { name = "ToppedOff Forever",   short = "ToppedOff",   logo = "Media\\Icon" },
     OutfitterForever   = { name = "Outfitter Forever",   short = "Outfitter",   logo = "Textures\\Logo" },
+    BattleTextForever  = { name = "BattleText Forever",  short = "BattleText",  logo = "Media\\Icon" },
 }
 local brand = BRANDS[ADDON] or { name = tostring(ADDON), short = tostring(ADDON), logo = "" }
 T.NAME = brand.name     -- window titles, chat, tooltips
@@ -234,6 +236,7 @@ end
 
 -- Dropdown: shows the current choice; click for a menu of the choices (or step
 -- to the next one where the game has no menus). labels[key] is the text shown.
+-- Set b.menuScroll to a height to make a long menu scroll.
 function T.Dropdown(parent, width, keys, labels, getter, setter)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(width, 22)
@@ -256,6 +259,7 @@ function T.Dropdown(parent, width, keys, labels, getter, setter)
         if MenuUtil and MenuUtil.CreateContextMenu then
             MenuUtil.CreateContextMenu(self, function(_, root)
                 if self.menuTitle then root:CreateTitle(self.menuTitle) end
+                if self.menuScroll and root.SetScrollMode then root:SetScrollMode(self.menuScroll) end
                 for _, k in ipairs(self.keys) do
                     root:CreateRadio(self.menuLabels and self.menuLabels[k] or label(k),
                         function() return self.getter() == k end, function() choose(k) end)

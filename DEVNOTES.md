@@ -55,7 +55,7 @@ Things only testable in game: real click-to-taunt in a group, Forever's exact se
 ## Releasing
 
 1. Make the change, run the tests, add a new section at the top of `CHANGELOG.md` (e.g. `## 1.7.1`), and add the matching entry at the top of `News.lua`.
-   If the change shows on the CurseForge project page (features, options, commands), update `CURSEFORGE.md` too (the README, adjusted: no logo, a short install note, full links) and paste the whole file into the project's description. The packager only uploads `CHANGELOG.md` with each file; the description never changes on its own.
+   If the change shows on the CurseForge project page (features, options, commands), update `CURSEFORGE.md` too (the README, adjusted: no logo, a short install note, full links), and **give the whole updated file in the reply as one Markdown code block**, ready to paste into the project's description (Edit project → Description, Markdown editor). Do this every time the file changes, without being asked. The packager only uploads `CHANGELOG.md` with each file; the description never changes on its own.
 2. Commit and push to `main`. The **Tests** workflow must be green.
 3. Tag and push the tag: `git tag v1.7.1 && git push origin v1.7.1`. Tags containing `beta` or `alpha` upload as Beta/Alpha files.
 4. The **Package and release** workflow runs the tests again, then uploads to CurseForge. Check the Actions tab for a green check and the CurseForge Files page (new files go through CurseForge review).

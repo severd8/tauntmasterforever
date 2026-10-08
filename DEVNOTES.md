@@ -17,6 +17,7 @@ A tanking addon for **World of Warcraft: Forever** (interface 16001, client 1.60
 - `Bindings.xml` — keybindings (loaded automatically by WoW, not listed in the `.toc`). Each is a `CLICK` binding on a bar (`TauntMasterForever_player`, `_party1`–`_party4`) or one of the hidden buttons `TauntMasterForever_ally` (unit `target`) and `TauntMasterForever_mouseover` (unit `mouseover`), both in `TM.hiddenButtons`, using the made-up mouse buttons `TMLeft`/`TMRight`. Their secure attributes are `*type-tmleft` / `*macrotext-tmleft` etc.; the `*` matches any modifier so controller buttons with modifiers still use the plain Left/Right Click spell. Binding names are set in `Core.lua` (`BINDING_NAME_...`). Only these buttons, the options and welcome windows (for Escape) and the minimap button have global names; nothing else does (`TM.KEYBIND_BAR_UNITS`).
 - `tests/` — offline test suite (not shipped). `wowstub.lua` fakes the WoW API; `run_tests.lua` holds the scenarios; `run.lua` runs them.
 - `CHANGELOG.md` — release notes shown on CurseForge. Newest version at the top.
+- `CURSEFORGE.md` — the CurseForge project description, pasted by hand (not shipped).
 - `.pkgmeta` — packager config (folder name, changelog, files to leave out of the download).
 - `.github/workflows/test.yml` — runs the tests on every push. `release.yml` — on a `v*` tag, runs the tests, then packages and uploads to CurseForge.
 
@@ -54,6 +55,7 @@ Things only testable in game: real click-to-taunt in a group, Forever's exact se
 ## Releasing
 
 1. Make the change, run the tests, add a new section at the top of `CHANGELOG.md` (e.g. `## 1.7.1`), and add the matching entry at the top of `News.lua`.
+   If the change shows on the CurseForge project page (features, options, commands), update `CURSEFORGE.md` too (the README, adjusted: no logo, a short install note, full links) and paste the whole file into the project's description. The packager only uploads `CHANGELOG.md` with each file; the description never changes on its own.
 2. Commit and push to `main`. The **Tests** workflow must be green.
 3. Tag and push the tag: `git tag v1.7.1 && git push origin v1.7.1`. Tags containing `beta` or `alpha` upload as Beta/Alpha files.
 4. The **Package and release** workflow runs the tests again, then uploads to CurseForge. Check the Actions tab for a green check and the CurseForge Files page (new files go through CurseForge review).

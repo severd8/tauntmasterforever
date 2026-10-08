@@ -1,3 +1,10 @@
+## 1.14.3
+
+Under the hood: nothing changes in how the addon looks or is used.
+
+- The shared look now also covers BattleText Forever, so all four Forever addons use the same file.
+- Small cleanup: the addon no longer adds an unused name to the game's global list.
+
 ## 1.14.2
 
 - New logo on the CurseForge page. Nothing changes in the game.

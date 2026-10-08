@@ -6,6 +6,9 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.14.4", date = "2026-10-08", items = {
+        "Same as 1.14.3, uploaded again under a new number.",
+    } },
     { version = "1.14.3", date = "2026-10-08", items = {
         "Under the hood: one shared look for all four Forever addons. Nothing changes in the game.",
     } },

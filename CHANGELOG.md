@@ -1,3 +1,7 @@
+## 1.14.4
+
+- Same as 1.14.3, uploaded again under a new number. Nothing changes in the game.
+
 ## 1.14.3
 
 Under the hood: nothing changes in how the addon looks or is used.

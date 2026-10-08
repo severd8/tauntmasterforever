@@ -6,6 +6,12 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.14.5", date = "2026-10-08", items = {
+        "Lost aggro warning: the header flashes when a mob you were tanking turns away.",
+        "Mouseover keybindings: point at a player and press to taunt what's on them. Works in raids.",
+        "Colorblind-friendly aggro colors, and the aggro word beside the health % (Appearance tab).",
+        "Separate settings for one character (General tab). Taunts use your game's language.",
+    } },
     { version = "1.14.4", date = "2026-10-08", items = {
         "Same as 1.14.3, uploaded again under a new number.",
     } },

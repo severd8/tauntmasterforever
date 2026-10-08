@@ -46,25 +46,26 @@ end
 TM.SPELL_KINDS = { enemy = true, friend = true, self = true }      -- kinds that cast a named spell
 TM.NO_TEXT_KINDS = { none = true, assist = true, target = true }   -- kinds that need no spell or macro text
 
-local function B(kind, text) return { kind = kind, text = text or "" } end
+local function B(kind, text, id) return { kind = kind, text = text or "", id = id } end
 
 -- Forever tank kits (verify in-game with /tm check):
 --   Warrior: Taunt, Mocking Blow, Challenging Shout
 --   Druid:   Growl, Challenging Roar (Bear Form)
 --   Paladin: Judgement taunts while Seal of Fury is active
+-- The names are English; the spell IDs give each player the name in their own language.
 TM.CLASS_DEFAULTS = {
     WARRIOR = {
-        ["1"] = B("enemy", "Taunt"),
-        ["2"] = B("enemy", "Mocking Blow"),
-        ["shift-1"] = B("self", "Challenging Shout"),
+        ["1"] = B("enemy", "Taunt", 355),
+        ["2"] = B("enemy", "Mocking Blow", 694),
+        ["shift-1"] = B("self", "Challenging Shout", 1161),
     },
     DRUID = {
-        ["1"] = B("enemy", "Growl"),
-        ["2"] = B("self", "Challenging Roar"),
+        ["1"] = B("enemy", "Growl", 6795),
+        ["2"] = B("self", "Challenging Roar", 5209),
     },
     PALADIN = {
-        ["1"] = B("enemy", "Judgement"),
-        ["shift-1"] = B("friend", "Blessing of Protection"),
+        ["1"] = B("enemy", "Judgement", 20271),
+        ["shift-1"] = B("friend", "Blessing of Protection", 1022),
     },
 }
 -- Every class gets these unless overridden.
@@ -95,6 +96,33 @@ function TM:GetClassSpells()
     return self.CLASS_SPELLS[self:PlayerClass()] or {}
 end
 
+-- A spell's name in the player's language, from its ID; the English name if the
+-- game can't say
+function TM:LocalSpellName(name, id)
+    if id and C_Spell and C_Spell.GetSpellName then
+        local ok, n = pcall(C_Spell.GetSpellName, id)
+        if ok and not IsSecret(n) and type(n) == "string" and n ~= "" then return n end
+    end
+    return name
+end
+
+-- Saved bindings still holding the English name of a class taunt get the local
+-- name, so players on other languages don't see "not found". English: no change.
+function TM:LocalizeBindings()
+    local spells = self:GetClassSpells()
+    for _, bind in pairs(self:GetBindings()) do
+        if type(bind) == "table" and self.SPELL_KINDS[bind.kind] and type(bind.text) == "string" then
+            for _, s in ipairs(spells) do
+                local loc = self:LocalSpellName(s.name, s.id)
+                if bind.text:lower() == s.name:lower() and loc ~= bind.text
+                    and not (C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(bind.text)) then
+                    bind.text = loc
+                end
+            end
+        end
+    end
+end
+
 -- Spell info by name. The game only finds spells by name once they're in your
 -- spellbook, so the class taunts are also looked up by ID (not learned yet).
 function TM:GetSpellInfo(name)
@@ -104,7 +132,7 @@ function TM:GetSpellInfo(name)
     local lower = name:lower()
     for _, spells in pairs(self.CLASS_SPELLS) do
         for _, s in ipairs(spells) do
-            if s.id and s.name:lower() == lower then
+            if s.id and (s.name:lower() == lower or self:LocalSpellName(s.name, s.id):lower() == lower) then
                 info = C_Spell.GetSpellInfo(s.id)
                 if info and type(info.name) == "string" and info.name:lower() == lower then return info end
             end
@@ -150,8 +178,11 @@ local DEFAULTS = {
     aggroSoundLevel = 2,       -- 1 = yellow, 2 = orange/red, 3 = red only
     aggroSoundChannel = "Master",
     flashAggro = true,
+    lostAggro = true,        -- header warns when a mob you were tanking turns away
     sortByRole = false,
     healthText = false,
+    aggroWithHealth = false, -- aggro word beside the health %
+    threatColors = "standard",
     keyHints = true,
     rangeFade = true,
     roleIcons = true,
@@ -182,6 +213,56 @@ local function FillDefaults(dst, src)
     end
 end
 
+-- Defaults and migrations for a settings table (the account's, or a character's own)
+local function PrepareSettings(db)
+    FillDefaults(db, DEFAULTS)
+    -- Settings migrations for installs from earlier versions
+    if (db.schema or 0) < 2 then
+        db.aggroSound = false -- aggro sound is now off by default
+        db.schema = 2
+    end
+    if db.schema < 3 then
+        if db.announceText == "Taunted!" then -- old default: switch to the one with names
+            db.announceText = DEFAULTS.announceText
+        end
+        db.schema = 3
+    end
+    -- Older versions allowed both cooldown modes at once
+    if db.cdShowOnCooldown and db.cdShowWhenReady then
+        db.cdShowWhenReady = false
+    end
+    return db
+end
+
+local function DeepCopy(t)
+    local out = {}
+    for k, v in pairs(t) do out[k] = type(v) == "table" and DeepCopy(v) or v end
+    return out
+end
+
+---------------------------------------------------------------------------
+-- Per-character settings. Off: every character shares the account's settings
+-- (click bindings are per class either way). On: this character gets its own
+-- copy, starting from the account's, and keeps it if switched off and on again.
+---------------------------------------------------------------------------
+function TM:UsesOwnSettings()
+    return self.charDB and self.charDB.ownSettings or false
+end
+
+function TM:SetOwnSettings(on)
+    local char = self.charDB
+    char.ownSettings = on and true or false
+    if on and type(char.settings) ~= "table" then char.settings = DeepCopy(self.accountDB) end
+    self.db = on and PrepareSettings(char.settings) or self.accountDB
+    if self.built then
+        self:RunOutOfCombat("position", function() TM:RestorePosition() end)
+        self:ApplySettings()
+        self:RefreshAll()
+    end
+    Print(on and "this character now uses its own settings."
+        or "this character now uses the settings shared by all your characters.")
+end
+
 function TM:PlayerClass()
     local _, class = UnitClass("player")
     return class
@@ -189,10 +270,10 @@ end
 
 function TM:DefaultBindings()
     local t = {}
-    for k, v in pairs(self.COMMON_DEFAULTS) do t[k] = B(v.kind, v.text) end
+    for k, v in pairs(self.COMMON_DEFAULTS) do t[k] = { kind = v.kind, text = v.text } end
     local classDefaults = self.CLASS_DEFAULTS[self:PlayerClass()]
     if classDefaults then
-        for k, v in pairs(classDefaults) do t[k] = B(v.kind, v.text) end
+        for k, v in pairs(classDefaults) do t[k] = { kind = v.kind, text = self:LocalSpellName(v.text, v.id) } end
     end
     return t
 end
@@ -232,12 +313,24 @@ end
 ---------------------------------------------------------------------------
 -- Unit buttons
 ---------------------------------------------------------------------------
-local THREAT_COLORS = {
-    [0] = { 0.40, 0.40, 0.40 }, -- grey: fine
-    [1] = { 1.00, 0.90, 0.00 }, -- yellow: more threat than the tank
-    [2] = { 1.00, 0.50, 0.00 }, -- orange: insecurely tanking
-    [3] = { 0.90, 0.05, 0.05 }, -- red: securely tanking
+TM.THREAT_PALETTES = {
+    standard = {
+        [0] = { 0.40, 0.40, 0.40 }, -- grey: fine
+        [1] = { 1.00, 0.90, 0.00 }, -- yellow: more threat than the tank
+        [2] = { 1.00, 0.50, 0.00 }, -- orange: insecurely tanking
+        [3] = { 0.90, 0.05, 0.05 }, -- red: securely tanking
+    },
+    -- Easier to tell apart with red-green colour blindness: sky blue, orange, purple
+    colorblind = {
+        [0] = { 0.40, 0.40, 0.40 },
+        [1] = { 0.34, 0.71, 0.91 },
+        [2] = { 0.90, 0.60, 0.00 },
+        [3] = { 0.80, 0.30, 0.75 },
+    },
 }
+TM.THREAT_PALETTE_KEYS = { "standard", "colorblind" }
+TM.THREAT_PALETTE_LABELS = { standard = "Standard", colorblind = "Colorblind-friendly" }
+local AGGRO_WORDS = { [1] = "High", [2] = "Aggro", [3] = "AGGRO" }
 
 TM.buttons = {}
 TM.unitToButton = {}
@@ -280,7 +373,8 @@ function TM:GetRole(unit)
 end
 
 function TM:CreateUnitButton(parent, unit)
-    local btn = CreateFrame("Button", "TauntMasterForever_" .. unit, parent, "SecureUnitButtonTemplate")
+    local name = self.KEYBIND_BAR_UNITS[unit] and ("TauntMasterForever_" .. unit) or nil
+    local btn = CreateFrame("Button", name, parent, "SecureUnitButtonTemplate")
     btn.unit = unit
     btn:SetAttribute("unit", unit)
     btn:RegisterForClicks("AnyUp")
@@ -416,19 +510,27 @@ end
 -- "Test" button and picking a new sound in the options
 function TM:TestAggroSound() PlayAggroSound(true) end
 
--- Health % text. Health can be secret; the game formats it for us when it is.
-local function SetHealthText(fs, unit)
+-- Health % text, optionally after a word ("Aggro 64%"). Health can be secret; the
+-- game formats it for us when it is.
+local function SetHealthText(fs, unit, word)
+    local prefix = word and (word .. " ") or ""
     local cur, max = UnitHealth(unit), UnitHealthMax(unit)
     if not IsSecret(cur) and not IsSecret(max) and cur and max and max > 0 then
-        fs:SetText(math.floor(cur / max * 100 + 0.5) .. "%")
+        fs:SetText(prefix .. math.floor(cur / max * 100 + 0.5) .. "%")
         return
     end
     local scale = CurveConstants and CurveConstants.ScaleTo100
     if UnitHealthPercent and scale then
         local ok, pct = pcall(UnitHealthPercent, unit, false, scale)
-        if ok and (IsSecret(pct) or pct ~= nil) and pcall(fs.SetFormattedText, fs, "%.0f%%", pct) then return end
+        if ok and (IsSecret(pct) or pct ~= nil) and pcall(fs.SetFormattedText, fs, prefix .. "%.0f%%", pct) then return end
     end
-    fs:SetText("")
+    fs:SetText(word or "")
+end
+
+-- The word shown with the health % for this threat level, when that option is on
+local function HealthWord(threat)
+    if not TM.db.aggroWithHealth then return nil end
+    return AGGRO_WORDS[threat or 0]
 end
 
 -- Can a click on this bar land? Returns two alphas, either of which may be hidden
@@ -535,7 +637,7 @@ function TM:UpdateHealth(btn)
     SetHealthBar(btn)
     local down = DownStatus(btn.unit)
     if down ~= btn.down then return self:UpdateButton(btn) end
-    if not down and self.db.healthText then SetHealthText(btn.statusText, btn.unit) end
+    if not down and self.db.healthText then SetHealthText(btn.statusText, btn.unit, HealthWord(btn.lastThreat)) end
 end
 
 function TM:UpdateButton(btn)
@@ -592,7 +694,8 @@ function TM:UpdateButton(btn)
 
     local threat = UnitThreatSituation(unit)
     if IsSecret(threat) or threat == nil then threat = 0 end
-    local c = THREAT_COLORS[threat] or THREAT_COLORS[0]
+    local colors = self.THREAT_PALETTES[db.threatColors] or self.THREAT_PALETTES.standard
+    local c = colors[threat] or colors[0]
     btn.bar:SetStatusBarColor(c[1], c[2], c[3])
 
     -- Someone other than you (and not another tank) has pulled aggro
@@ -608,15 +711,9 @@ function TM:UpdateButton(btn)
     btn.lastThreat = threat
 
     if db.healthText then
-        SetHealthText(btn.statusText, unit)
-    elseif threat == 3 then
-        btn.statusText:SetText("AGGRO")
-    elseif threat == 2 then
-        btn.statusText:SetText("Aggro")
-    elseif threat == 1 then
-        btn.statusText:SetText("High")
+        SetHealthText(btn.statusText, unit, HealthWord(threat))
     else
-        btn.statusText:SetText("")
+        btn.statusText:SetText(AGGRO_WORDS[threat] or "")
     end
 end
 
@@ -627,6 +724,48 @@ function TM:RefreshAll()
     self:UpdateManaWarning()
     self:UpdateCooldowns()
     self:UpdatePlateMarks()
+    self:CheckLostAggro()
+end
+
+---------------------------------------------------------------------------
+-- Lost aggro: a mob you had firmly (your target) turns to someone else. The
+-- header flashes and says so for a few seconds, with the aggro sound if that's on.
+-- Only shows information; taunting back is still your click.
+---------------------------------------------------------------------------
+local LOST_AGGRO_SECONDS = 3
+
+function TM:CheckLostAggro()
+    if not (self.db.lostAggro and self.handle) then self.lastTargetThreat = nil return end
+    local s = UnitThreatSituation("player", "target")
+    local dead = UnitIsDeadOrGhost("target")
+    -- Hidden from addons, no threat at all (out of combat) or a dead mob: nothing to compare
+    if IsSecret(s) or type(s) ~= "number" or IsSecret(dead) or dead then
+        self.lastTargetThreat = nil
+        return
+    end
+    if self.lastTargetThreat == 3 and s <= 1 then self:ShowLostAggro() end
+    self.lastTargetThreat = s
+end
+
+function TM:ShowLostAggro()
+    local h = self.handle
+    h.text:SetText("Lost aggro!")
+    h.text:SetTextColor(1, 0.35, 0.25)
+    h.alertAnim:Play()
+    if self.db.aggroSound then PlayAggroSound(true) end
+    self.lostAggroShown = (self.lostAggroShown or 0) + 1
+    local shown = self.lostAggroShown
+    C_Timer.After(LOST_AGGRO_SECONDS, function()
+        if TM.lostAggroShown == shown then TM:ClearLostAggro() end
+    end)
+end
+
+function TM:ClearLostAggro()
+    local h, gold = self.handle, ns.Theme.C.gold
+    h.text:SetText(ns.Theme.SHORT)
+    h.text:SetTextColor(gold[1], gold[2], gold[3])
+    h.alertAnim:Stop()
+    h.alert:SetAlpha(0)
 end
 
 ---------------------------------------------------------------------------
@@ -1118,7 +1257,10 @@ TM.KEYBIND_UNITS = {
     { unit = "party3", label = "Party 3" },
     { unit = "party4", label = "Party 4" },
     { unit = "ally",   label = "Targeted ally" },
+    { unit = "mouseover", label = "Mouseover" },
 }
+-- Bars a keybinding presses get a global name ("TauntMasterForever_party1"); the rest don't need one
+TM.KEYBIND_BAR_UNITS = { player = true, party1 = true, party2 = true, party3 = true, party4 = true }
 for _, u in ipairs(TM.KEYBIND_UNITS) do
     _G["BINDING_NAME_CLICK TauntMasterForever_" .. u.unit .. ":TMLeft"] = u.label .. ": Left Click spell"
     _G["BINDING_NAME_CLICK TauntMasterForever_" .. u.unit .. ":TMRight"] = u.label .. ": Right Click spell"
@@ -1154,7 +1296,7 @@ function TM:ApplyBindings()
         for _, btn in ipairs(self.buttons) do
             self:ApplyBindingsToButton(btn, bindings)
         end
-        if self.allyButton then self:ApplyBindingsToButton(self.allyButton, bindings) end
+        for _, b in ipairs(self.hiddenButtons or {}) do self:ApplyBindingsToButton(b, bindings) end
     end)
 end
 
@@ -1381,7 +1523,7 @@ end
 -- Main frame construction
 ---------------------------------------------------------------------------
 function TM:BuildFrames()
-    local main = CreateFrame("Frame", "TauntMasterForeverFrame", UIParent)
+    local main = CreateFrame("Frame", nil, UIParent)
     main:SetSize(1, 1)
     main:SetMovable(true)
     main:SetClampedToScreen(true)
@@ -1395,6 +1537,18 @@ function TM:BuildFrames()
     handle:EnableMouse(true)
     handle:RegisterForDrag("LeftButton")
     ns.Theme.HeaderStrip(handle)   -- logo and name, the same bar as ToppedOff Forever's
+    -- Red pulse for the "Lost aggro!" warning
+    local alert = handle:CreateTexture(nil, "ARTWORK", nil, -1)
+    alert:SetAllPoints()
+    alert:SetColorTexture(1, 0.15, 0.1, 0.6)
+    alert:SetAlpha(0)
+    local alertAnim = alert:CreateAnimationGroup()
+    alertAnim:SetLooping("BOUNCE")
+    local pulse = alertAnim:CreateAnimation("Alpha")
+    pulse:SetFromAlpha(0)
+    pulse:SetToAlpha(1)
+    pulse:SetDuration(0.3)
+    handle.alert, handle.alertAnim = alert, alertAnim
     handle:SetScript("OnDragStart", function()
         if TM.db.locked or InCombatLockdown() then return end
         main.isMoving = true
@@ -1419,11 +1573,11 @@ function TM:BuildFrames()
     handle:SetScript("OnLeave", function() GameTooltip:Hide() end)
     self.handle = handle
 
-    local partyFrame = CreateFrame("Frame", "TauntMasterForeverParty", main, "SecureFrameTemplate")
+    local partyFrame = CreateFrame("Frame", nil, main, "SecureFrameTemplate")
     partyFrame:SetPoint("TOPLEFT", main, "TOPLEFT")
     self.partyFrame = partyFrame
 
-    local raidFrame = CreateFrame("Frame", "TauntMasterForeverRaid", main, "SecureFrameTemplate")
+    local raidFrame = CreateFrame("Frame", nil, main, "SecureFrameTemplate")
     raidFrame:SetPoint("TOPLEFT", main, "TOPLEFT")
     self.raidFrame = raidFrame
 
@@ -1447,14 +1601,21 @@ function TM:BuildFrames()
     totLabel:SetText("Target's target")
     self.totLabel = totLabel
 
-    -- Hidden button for the "Targeted ally" keybindings: taunts whatever is attacking
-    -- the friendly player you have targeted. Works in raids, where per-slot bindings don't.
-    local ally = CreateFrame("Button", "TauntMasterForever_ally", UIParent, "SecureUnitButtonTemplate")
-    ally.unit = "target"
-    ally:SetAttribute("unit", "target")
-    ally:RegisterForClicks("AnyUp")
-    ally:HookScript("PreClick", function(self, mouseButton) TM:OnBarClick(mouseButton, self) end)
-    self.allyButton = ally
+    -- Hidden buttons for keybindings that don't belong to a bar. "Targeted ally"
+    -- taunts whatever is attacking the friendly player you have targeted;
+    -- "Mouseover" whatever is attacking the player under your mouse (raid frames,
+    -- the world). Both work in raids, where per-slot bindings don't.
+    local function HiddenButton(key, unit)
+        local b = CreateFrame("Button", "TauntMasterForever_" .. key, UIParent, "SecureUnitButtonTemplate")
+        b.unit = unit
+        b:SetAttribute("unit", unit)
+        b:RegisterForClicks("AnyUp")
+        b:HookScript("PreClick", function(self, mouseButton) TM:OnBarClick(mouseButton, self) end)
+        return b
+    end
+    self.allyButton = HiddenButton("ally", "target")
+    self.mouseoverButton = HiddenButton("mouseover", "mouseover")
+    self.hiddenButtons = { self.allyButton, self.mouseoverButton }
 
     self:BuildMinimapButton()
     self:BuildCooldownIcons()
@@ -1566,14 +1727,14 @@ function TM:CheckSpells()
         any = true
         local info = self:GetSpellInfo(bind.text)
         if not info then
-            print(("  %s: |cffff4040%s — not found. Check spelling or that it exists in Forever.|r"):format(click.label, bind.text))
+            Print(("%s: |cffff4040%s — not found. Check spelling or that it exists in Forever.|r"):format(click.label, bind.text))
         elseif SpellKnown(info.spellID) == false then
-            print(("  %s: |cffffcc00%s (ID %d) — exists, not learned yet.|r"):format(click.label, bind.text, info.spellID))
+            Print(("%s: |cffffcc00%s (ID %d) — exists, not learned yet.|r"):format(click.label, bind.text, info.spellID))
         else
-            print(("  %s: |cff40ff40%s (ID %d) — OK.|r"):format(click.label, bind.text, info.spellID))
+            Print(("%s: |cff40ff40%s (ID %d) — OK.|r"):format(click.label, bind.text, info.spellID))
         end
     end)
-    if not any then print("  No spells bound. Open /tm spells.") end
+    if not any then Print("No spells bound. Open /tm spells.") end
 end
 
 -- "TauntMaster Forever loaded. Growl assigned to Left Click, Challenging Roar assigned to Right Click."
@@ -1598,13 +1759,13 @@ end
 
 local function Help()
     Print("commands:")
-    print("  /tm — open options")
-    print("  /tm show | hide | toggle — show or hide the bars")
-    print("  /tm lock | unlock — lock or unlock the bars' position")
-    print("  /tm spells — jump to Click Bindings in the options")
-    print("  /tm check — verify your bound spells exist in Forever")
-    print("  /tm news — show the welcome / what's new window")
-    print("  /tm reset — move the bars back to the default position")
+    Print("/tm — open options")
+    Print("/tm show | hide | toggle — show or hide the bars")
+    Print("/tm lock | unlock — lock or unlock the bars' position")
+    Print("/tm spells — jump to Click Bindings in the options")
+    Print("/tm check — verify your bound spells exist in Forever")
+    Print("/tm news — show the welcome / what's new window")
+    Print("/tm reset — move the bars back to the default position")
 end
 
 SLASH_TAUNTMASTERFOREVER1 = "/tm"
@@ -1631,9 +1792,9 @@ SlashCmdList.TAUNTMASTERFOREVER = function(msg)
     elseif msg == "debug" then
         local function show(label, v)
             if IsSecret(v) then
-                print("  " .. label .. ": |cffff4040SECRET (hidden from addons)|r")
+                Print("" .. label .. ": |cffff4040SECRET (hidden from addons)|r")
             else
-                print("  " .. label .. ": " .. tostring(v))
+                Print("" .. label .. ": " .. tostring(v))
             end
         end
         Print("debug (v" .. (C_AddOns and C_AddOns.GetAddOnMetadata(ADDON, "Version") or "?") .. ")")
@@ -1648,7 +1809,7 @@ SlashCmdList.TAUNTMASTERFOREVER = function(msg)
         local info = bind and TM:GetSpellInfo(bind.text)
         local cd = info and C_Spell.GetSpellCooldown and C_Spell.GetSpellCooldown(info.spellID)
         if cd then
-            print("  Left Click cooldown (" .. info.name .. "):")
+            Print("Left Click cooldown (" .. info.name .. "):")
             show("    start", cd.startTime)
             show("    duration", cd.duration)
             show("    isActive", cd.isActive)
@@ -1687,28 +1848,22 @@ events:RegisterEvent("PLAYER_ROLES_ASSIGNED")
 events:RegisterEvent("UPDATE_BINDINGS")
 events:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 events:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
+events:RegisterEvent("PLAYER_TARGET_CHANGED")
 events:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" then
         if arg1 ~= ADDON then return end
         TauntMasterForeverDB = TauntMasterForeverDB or {}
-        FillDefaults(TauntMasterForeverDB, DEFAULTS)
-        TM.db = TauntMasterForeverDB
-        -- Settings migrations for installs from earlier versions
-        if (TM.db.schema or 0) < 2 then
-            TM.db.aggroSound = false -- aggro sound is now off by default
-            TM.db.schema = 2
-        end
-        if TM.db.schema < 3 then
-            if TM.db.announceText == "Taunted!" then -- old default: switch to the one with names
-                TM.db.announceText = DEFAULTS.announceText
-            end
-            TM.db.schema = 3
-        end
-        -- Older versions allowed both cooldown modes at once
-        if TM.db.cdShowOnCooldown and TM.db.cdShowWhenReady then
-            TM.db.cdShowWhenReady = false
+        TM.accountDB = PrepareSettings(TauntMasterForeverDB)
+        if type(TauntMasterForeverCharDB) ~= "table" then TauntMasterForeverCharDB = {} end
+        TM.charDB = TauntMasterForeverCharDB
+        if TM.charDB.ownSettings and type(TM.charDB.settings) == "table" then
+            TM.db = PrepareSettings(TM.charDB.settings)
+        else
+            TM.charDB.ownSettings = false
+            TM.db = TM.accountDB
         end
     elseif event == "PLAYER_LOGIN" then
+        TM:LocalizeBindings()
         TM:RunOutOfCombat("build", function() TM:BuildFrames() end)
         TM:PrintLoadMessage()
         TM:MaybeShowSplash()
@@ -1722,6 +1877,9 @@ events:SetScript("OnEvent", function(_, event, arg1)
         TM:OnNamePlateRemoved(arg1)
     elseif not TM.built then
         return
+    elseif event == "PLAYER_TARGET_CHANGED" then
+        TM.lastTargetThreat = nil   -- a new mob: nothing was lost
+        TM:CheckLostAggro()
     elseif event == "UPDATE_BINDINGS" then
         TM:UpdateKeyHints()
     elseif event == "SPELL_UPDATE_COOLDOWN" then
@@ -1732,6 +1890,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
     elseif arg1 and TM.unitToButton[arg1] then
         if event == "UNIT_THREAT_SITUATION_UPDATE" then
             TM:UpdateButton(TM.unitToButton[arg1])
+            if arg1 == "player" then TM:CheckLostAggro() end
         else
             TM:UpdateHealth(TM.unitToButton[arg1])   -- UNIT_HEALTH, UNIT_MAXHEALTH
         end

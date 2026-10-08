@@ -226,14 +226,20 @@ assert(sawGrowl and sawRoar, "druid taunts listed")
 sawRoar.fn()
 assertEq(TM:GetBindings()["1"].text, "Challenging Roar", "picked from menu")
 assertEq(TM:GetBindings()["1"].kind, "self", "kind carried over")
+-- "Custom spell..." opens that click's row on the Click Bindings tab (no Blizzard popup)
+TM:SetBinding("1", "target")
 for _, e in ipairs(menu.entries) do if e.text == "Custom spell..." then e.fn() end end
-assertEq(POPUPS[#POPUPS].name, "TAUNTMASTERFOREVER_CUSTOM", "custom popup")
--- Accept the popup with typed text
-local popup = { data = "1" }
-local eb = { GetText = function() return "  Taunt  " end }
-popup.GetEditBox = function() return eb end
-StaticPopupDialogs.TAUNTMASTERFOREVER_CUSTOM.OnAccept(popup, "1")
+assertEq(#POPUPS, 0, "no Blizzard popup")
+assertEq(TM._tabs.current(), "bindings", "custom spell opens Click Bindings")
+local customRow
+for _, row in ipairs(TM._spellRows) do if row.key == "1" then customRow = row end end
+assertEq(customRow.kind, "enemy", "row switched to a spell on their target")
+assertEq(customRow.edit.__focus, true, "spell box focused")
+assert(TM._bindingsMsg:GetText():find("then click Save"), "tells you to save")
+customRow.edit:SetText("  Taunt  ")
+walk(win, function(f) if f.__kind == "Button" and f.__text == "Save" then f.__scripts.OnClick(f) end end)
 assertEq(TM:GetBindings()["1"].text, "Taunt", "custom spell trimmed and saved")
+assertEq(TM:GetBindings()["1"].kind, "enemy", "custom spell cast on their target")
 TM.db.bindings.DRUID = TM:DefaultBindings(); TM:ApplyBindings()
 -- A class with a utility spell lists it under its own heading, after the taunts
 STATE.class = "PALADIN"; MENUS = {}
@@ -394,11 +400,11 @@ for name in xml:gmatch('name="([^"]+)"') do
     count = count + 1
     assert(_G["BINDING_NAME_" .. name], "missing binding name for " .. name)
 end
-assertEq(count, 12, "12 keybindings")
+assertEq(count, 14, "14 keybindings")
 -- Own section in the Keybindings menu, like other addons
 local cats = {}
 for c in xml:gmatch('category="([^"]+)"') do cats[#cats + 1] = c end
-assertEq(#cats, 12, "every binding has a category")
+assertEq(#cats, 14, "every binding has a category")
 for _, c in ipairs(cats) do assertEq(c, "TauntMaster Forever", "category is the addon's own section") end
 -- Keybinding presses use the plain Left/Right Click spell, whatever modifier is held
 TM:GetBindings()["shift-1"] = { kind = "enemy", text = "Taunt" }
@@ -410,6 +416,10 @@ assertEq(p1.__attrs["shift-macrotext1"], "/cast [@party1target,harm,nodead] Taun
 -- Targeted ally button taunts what's attacking your friendly target
 local ally = TauntMasterForever_ally
 assertEq(ally.__attrs["*macrotext-tmleft"], "/cast [@targettarget,harm,nodead] Growl", "ally keybind macro")
+-- Mouseover button taunts what's attacking the player under your mouse (raid frames, the world)
+local mo = TauntMasterForever_mouseover
+assertEq(mo.__attrs["*macrotext-tmleft"], "/cast [@mouseovertarget,harm,nodead] Growl", "mouseover keybind macro")
+assertEq(mo.__attrs["*macrotext-tmright"], "/cast Challenging Roar", "mouseover right keybind")
 -- Middle-click style bindings map to the secure type
 TM:GetBindings()["2"] = { kind = "target", text = "" }; TM:ApplyBindings()
 assertEq(p1.__attrs["*type-tmright"], "target", "non-spell keybind type")
@@ -855,7 +865,7 @@ assertEq(#BLOCKED, 0, "no protected frame touched in combat: " .. table.concat(B
 COMBAT = false
 fire("PLAYER_REGEN_ENABLED")
 assertEq(layouts, 1, "one layout for 25 changes")
-assertEq(binds, #TM.buttons + 1, "bindings applied once to each bar (and the targeted-ally button)")
+assertEq(binds, #TM.buttons + #TM.hiddenButtons, "bindings applied once to each bar (and the targeted-ally and mouseover buttons)")
 assertEq(TM.unitToButton.party1.__size[1], 125, "with the last value")
 assertEq(TM.pending, nil, "nothing left waiting")
 fire("PLAYER_REGEN_ENABLED")
@@ -979,4 +989,182 @@ TM:ApplySettings(); SlashCmdList.TAUNTMASTERFOREVER("reset")
 assertEq(TM.unitToButton.party1.__attrs.macrotext1, "/cast [@party1target,harm,nodead] Growl", "default bindings are back")
 TM.db.width, TM.db.classColors = saved.width, saved.classColors
 TM:ApplySettings()
+
+step("class taunts in the player's language")
+-- A German client: the game calls Growl "Knurren"
+KNOWN.Knurren, KNOWN.Growl = KNOWN.Growl, nil
+KNOWN.Knurren.name = "Knurren"
+LOCAL_NAMES[6795] = "Knurren"
+assertEq(TM:DefaultBindings()["1"].text, "Knurren", "new defaults use the local name")
+assertEq(TM:DefaultBindings()["2"].text, "Challenging Roar", "falls back to English when the game gives no other name")
+-- A binding saved in English becomes the local name at login; others are left alone
+TM.db.bindings.DRUID = { ["1"] = { kind = "enemy", text = "Growl" }, ["2"] = { kind = "self", text = "Bear Form" } }
+TM:LocalizeBindings()
+assertEq(TM:GetBindings()["1"].text, "Knurren", "saved English taunt translated")
+assertEq(TM:GetBindings()["2"].text, "Bear Form", "other spells unchanged")
+assertEq(TM:GetSpellInfo("knurren").spellID, 6795, "found by its local name")
+KNOWN.Growl, KNOWN.Knurren = KNOWN.Knurren, nil
+KNOWN.Growl.name = "Growl"
+LOCAL_NAMES = {}
+TM:LocalizeBindings()
+assertEq(TM:GetBindings()["1"].text, "Knurren", "an English client never rewrites names it can't find")
+TM.db.bindings.DRUID = TM:DefaultBindings(); TM:ApplyBindings()
+assertEq(TM:GetBindings()["1"].text, "Growl", "English client: English names")
+
+step("lost aggro warning")
+local realThreat = UnitThreatSituation
+local targetThreat
+UnitThreatSituation = function(u, mob) if mob == "target" then return targetThreat end return realThreat(u) end
+local realAfter = C_Timer.After
+local later = {}
+C_Timer.After = function(_, fn) later[#later + 1] = fn end
+local h = TM.handle
+TM.db.aggroSound = true
+local logBefore = #LOG
+targetThreat = 3; tick()
+targetThreat = 3; tick()
+assertEq(h.text:GetText(), "TauntMaster", "no warning while you hold it")
+targetThreat = 1; tick()
+assertEq(h.text:GetText(), "Lost aggro!", "header warns when the mob turns away")
+assertEq(h.alertAnim.__playing, true, "header pulses")
+local played = false
+for i = logBefore + 1, #LOG do if LOG[i]:find("^SOUND") then played = true end end
+assert(played, "aggro sound plays with the warning")
+for _, fn in ipairs(later) do fn() end; later = {}
+assertEq(h.text:GetText(), "TauntMaster", "back to the name after a few seconds")
+assertEq(h.alertAnim.__playing, false, "pulse stops")
+-- Switching targets, hidden threat and an orange (still tanking) mob don't warn
+targetThreat = 3; tick(); targetThreat = 0; fire("PLAYER_TARGET_CHANGED"); tick()
+assertEq(h.text:GetText(), "TauntMaster", "a new target is not a loss")
+targetThreat = 3; tick(); targetThreat = 2; tick()
+assertEq(h.text:GetText(), "TauntMaster", "still tanking (orange) is not a loss")
+targetThreat = 3; tick(); SECRET_MODE = true; targetThreat = UnitExists("player"); SECRET_MODE = false; tick()
+assertEq(h.text:GetText(), "TauntMaster", "hidden threat: no guess")
+targetThreat = 3; tick(); targetThreat = nil; tick()
+assertEq(h.text:GetText(), "TauntMaster", "combat over: no warning")
+TM.db.lostAggro = false; targetThreat = 3; tick(); targetThreat = 0; tick()
+assertEq(h.text:GetText(), "TauntMaster", "can be turned off")
+TM.db.lostAggro = true; TM.db.aggroSound = false
+UnitThreatSituation = realThreat; C_Timer.After = realAfter; targetThreat = nil
+
+step("colorblind-friendly aggro colors and aggro word with health %")
+STATE.inGroup, STATE.inRaid, STATE.party = true, false, 2
+STATE.unitsExist = { player = true, party1 = true, party2 = true }
+STATE.threat = { party1 = 3 }
+local bar1 = TM.unitToButton.party1
+tick()
+local function barColor() local c = bar1.bar.__color or {} return c[1] end
+local realSetColor = bar1.bar.SetStatusBarColor
+bar1.bar.SetStatusBarColor = function(self, r, g, b) self.__color = { r, g, b } end
+tick(); assertEq(barColor(), 0.90, "standard red")
+TM.db.threatColors = "colorblind"; tick(); assertEq(barColor(), 0.80, "colorblind purple")
+TM.db.threatColors = "nonsense"; tick(); assertEq(barColor(), 0.90, "unknown choice falls back to standard")
+TM.db.threatColors = "standard"
+bar1.bar.SetStatusBarColor = realSetColor
+TM.db.healthText = true; tick()
+assertEq(bar1.statusText:GetText(), "50%", "health % alone")
+TM.db.aggroWithHealth = true; tick()
+assertEq(bar1.statusText:GetText(), "AGGRO 50%", "aggro word beside the health %")
+TM:UpdateHealth(bar1)
+assertEq(bar1.statusText:GetText(), "AGGRO 50%", "health updates keep the word")
+-- Health hidden, threat readable: the game fills in the % after the word
+local realHP, realHPMax = UnitHealth, UnitHealthMax
+SECRET_MODE = true; local hidden50 = UnitHealth("party1"); SECRET_MODE = false
+UnitHealth = function() return hidden50 end
+UnitHealthMax = function() return hidden50 end
+local realPct = UnitHealthPercent
+UnitHealthPercent = function() return hidden50 end
+tick()
+assertEq(bar1.statusText.__fmt, "AGGRO %.0f%%", "hidden health formatted after the word")
+UnitHealth, UnitHealthMax, UnitHealthPercent = realHP, realHPMax, realPct
+STATE.threat = {}; tick()
+assertEq(bar1.statusText:GetText(), "50%", "no word without aggro")
+TM.db.healthText, TM.db.aggroWithHealth = false, false; tick()
+-- The new choices are on the Appearance and Alerts tabs
+TM:OpenConfig("appearance")
+local seen = {}
+walk(win, function(f) if f.__text then seen[f.__text] = true end end)
+assert(seen["Keep the aggro word beside it"] and seen["Aggro colors"] and seen["Standard"], "appearance controls")
+assert(seen["Warn when you lose aggro on your target"], "lost aggro switch")
+assert(seen["This character uses its own settings"], "own settings switch")
+TM:OpenConfig()
+
+step("per-character settings")
+local account = TM.accountDB
+TM.charDB.settings = nil   -- the switch test above already made a copy
+TM.db.width = 150; TM:ApplySettings()
+assertEq(TM:UsesOwnSettings(), false, "shared by default")
+TM:SetOwnSettings(true)
+assert(TM.db ~= account, "own table")
+assertEq(TM.db.width, 150, "starts as a copy of the shared settings")
+TM.db.width = 90; TM:ApplySettings()
+assertEq(account.width, 150, "shared settings untouched")
+assertEq(TM.unitToButton.party1.__size[1], 90, "bars use this character's settings")
+TM.db.bindings.DRUID["1"] = { kind = "enemy", text = "Taunt" }; TM:ApplyBindings()
+assertEq(account.bindings.DRUID["1"].text, "Growl", "click bindings are separate too")
+TM:SetOwnSettings(false)
+assertEq(TM.db, account, "back to shared")
+assertEq(TM.unitToButton.party1.__size[1], 150, "bars follow")
+assertEq(TM.unitToButton.party1.__attrs.macrotext1, "/cast [@party1target,harm,nodead] Growl", "shared bindings back")
+TM:SetOwnSettings(true)
+assertEq(TM.db.width, 90, "own settings kept while switched off")
+-- Saved own settings load next session, filled in with defaults
+fire("ADDON_LOADED", ADDON)
+assertEq(TM.db.width, 90, "own settings loaded")
+assertEq(TM.db.lostAggro, true, "new settings filled in")
+TauntMasterForeverCharDB = { ownSettings = true, settings = "broken" }
+fire("ADDON_LOADED", ADDON)
+assertEq(TM.db, TM.accountDB, "a damaged character file falls back to shared settings")
+TM:SetOwnSettings(false)
+TM.db.width = 120; TM:ApplySettings()
+
+step("chat lines start with the logo and name")
+local from = #LOG
+SlashCmdList.TAUNTMASTERFOREVER("help"); SlashCmdList.TAUNTMASTERFOREVER("check"); SlashCmdList.TAUNTMASTERFOREVER("debug")
+assert(#LOG > from + 10, "commands printed")
+for i = from + 1, #LOG do
+    if not LOG[i]:find("^SOUND") then
+        assert(LOG[i]:find(ns.Theme.CHAT_PREFIX, 1, true) == 1, "chat line without the prefix: " .. LOG[i])
+    end
+end
+
+step("only keybinding targets have global names")
+assertEq(_G.TauntMasterForever, nil, "no global addon table")
+assert(TauntMasterForever_party1 and TauntMasterForever_player and TauntMasterForever_ally and TauntMasterForever_mouseover, "bound buttons named")
+for _, b in ipairs(TM.raidButtons) do assertEq(b:GetName(), nil, "raid bars unnamed") end
+assertEq(TM.totButton:GetName(), nil, "target's target bar unnamed")
+assertEq(TM.main:GetName(), nil, "main frame unnamed")
+
+step("zone change")
+STATE.inGroup, STATE.inRaid, STATE.party = true, false, 2
+STATE.unitsExist = { player = true, party1 = true, party2 = true }
+MOB_TARGET = { nameplate3 = "party2" }
+fire("NAME_PLATE_UNIT_ADDED", "nameplate3")
+assertEq(PLATES.nameplate3.tmForeverMark.__shown, true, "marked before the loading screen")
+-- Loading screen: plates go away, then the new zone comes in
+fire("NAME_PLATE_UNIT_REMOVED", "nameplate3")
+assertEq(PLATES.nameplate3.tmForeverMark.__shown, false, "mark cleared with its plate")
+fire("PLAYER_ENTERING_WORLD", false, false)
+INSTANCE = true; STATE.party = 1; STATE.unitsExist = { player = true, party1 = true }
+fire("GROUP_ROSTER_UPDATE"); tick()
+MOB_TARGET = {}; TM:UpdatePlateMarks()
+assertEq(PLATES.nameplate3.tmForeverMark.__shown, false, "no stale mark in the new zone")
+INSTANCE = false
+
+step("joining a group mid-fight")
+STATE.inGroup, STATE.inRaid, STATE.party = false, false, 0
+STATE.unitsExist = { player = true }
+fire("GROUP_ROSTER_UPDATE"); tick()
+COMBAT = true; BLOCKED = {}
+STATE.inGroup, STATE.inRaid = true, true
+STATE.unitsExist = { player = true, raid1 = true, raid2 = true, raid3 = true, raid4 = true, raid5 = true, raid6 = true }
+RAID_GROUPS = { [6] = 2 }
+fire("GROUP_ROSTER_UPDATE"); tick()
+assertEq(#BLOCKED, 0, "nothing protected touched mid-fight: " .. table.concat(BLOCKED, ", "))
+assert(TM.pending and TM.pending.fns.layout, "raid layout waits for the fight to end")
+COMBAT = false; fire("PLAYER_REGEN_ENABLED")
+assertEq(TM.pending, nil, "applied after the fight")
+assertEq((pos("raid6")), TM.db.width + TM.db.spacing, "raid6 laid out in group 2's column")
+STATE.inGroup, STATE.inRaid, STATE.party = false, false, 0; RAID_GROUPS = {}
+STATE.unitsExist = { player = true }; fire("GROUP_ROSTER_UPDATE")
 print("ALL TESTS PASSED")

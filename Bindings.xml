@@ -14,4 +14,6 @@
   <Binding name="CLICK TauntMasterForever_party4:TMRight" category="TauntMaster Forever"/>
   <Binding name="CLICK TauntMasterForever_ally:TMLeft" category="TauntMaster Forever"/>
   <Binding name="CLICK TauntMasterForever_ally:TMRight" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_mouseover:TMLeft" category="TauntMaster Forever"/>
+  <Binding name="CLICK TauntMasterForever_mouseover:TMRight" category="TauntMaster Forever"/>
 </Bindings>

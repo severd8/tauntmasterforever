@@ -64,10 +64,14 @@ end
 ---------------------------------------------------------------------------
 -- Spell picker (Left / Right Click Spell)
 ---------------------------------------------------------------------------
+-- A class spell's name in the player's language
+local function LocalName(s) return TM:LocalSpellName(s.name, s.id) end
+
 local function SpellLabel(s)
-    local info = TM:GetSpellInfo(s.name)
+    local name = LocalName(s)
+    local info = TM:GetSpellInfo(name)
     local icon = info and info.iconID and ("|T" .. info.iconID .. ":16:16:0:0|t ") or ""
-    local label = icon .. s.name
+    local label = icon .. name
     if s.note then label = label .. " |cff999999(" .. s.note .. ")|r" end
     if not info then
         label = label .. " |cffff4040not found|r"
@@ -103,8 +107,8 @@ local function CollectPlayerSpells()
         end
     end
     for _, s in ipairs(TM:GetClassSpells()) do
-        local info = TM:GetSpellInfo(s.name)
-        add(info and info.name or s.name, info and info.iconID)
+        local info = TM:GetSpellInfo(LocalName(s))
+        add(info and info.name or LocalName(s), info and info.iconID)
     end
     pcall(function()
         if C_SpellBook and C_SpellBook.GetNumSpellBookSkillLines then
@@ -165,42 +169,17 @@ local function BindingText(key)
     return b.text
 end
 
-StaticPopupDialogs["TAUNTMASTERFOREVER_CUSTOM"] = {
-    text = "Type a spell name.\nIt will be cast on the clicked member's target:",
-    button1 = ACCEPT,
-    button2 = CANCEL,
-    hasEditBox = true,
-    maxLetters = 64,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-    preferredIndex = 3,
-    OnAccept = function(self, data)
-        local eb = (self.GetEditBox and self:GetEditBox()) or self.editBox or self.EditBox
-        local text = eb and strtrim(eb:GetText() or "")
-        if text and text ~= "" then
-            local _, exact = ValidateSpell(text)
-            TM:SetBinding(data or self.data, "enemy", exact or text)
-            RunRefreshers()
-        end
-    end,
-    EditBoxOnEnterPressed = function(self)
-        local popup = self:GetParent()
-        StaticPopupDialogs.TAUNTMASTERFOREVER_CUSTOM.OnAccept(popup, popup.data)
-        popup:Hide()
-    end,
-    EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
-}
+local EditCustomSpell   -- defined with the Click Bindings tab
 
 local function ShowSpellMenu(owner, key)
     local spells = TM:GetClassSpells()
     local current = TM:GetBindings()[key]
 
     local function isSelected(s)
-        return current and current.text == s.name and current.kind == s.kind
+        return current and current.text == LocalName(s) and current.kind == s.kind
     end
     local function choose(s)
-        TM:SetBinding(key, s.kind, s.name)
+        TM:SetBinding(key, s.kind, LocalName(s))
         RunRefreshers()
     end
 
@@ -237,9 +216,7 @@ local function ShowSpellMenu(owner, key)
         end
         radios(true)
         root:CreateDivider()
-        root:CreateButton("Custom spell...", function()
-            StaticPopup_Show("TAUNTMASTERFOREVER_CUSTOM", nil, nil, key)
-        end)
+        root:CreateButton("Custom spell...", function() EditCustomSpell(key) end)
         root:CreateButton("Target them", function() TM:SetBinding(key, "target"); RunRefreshers() end)
         root:CreateButton("None", function() TM:SetBinding(key, "none"); RunRefreshers() end)
     end)
@@ -644,46 +621,55 @@ local function BuildLayoutTab(p)
 end
 
 local function BuildAppearanceTab(p)
-    local names = Card(p, "Bars & names", 0, 0, PAGE_W, 120)
+    local names = Card(p, "Bars & names", 0, 0, PAGE_W, 146)
     Switch(names, "Class colors for names", 12, -30, "classColors")
     Switch(names, "Role icons", 12, -56, "roleIcons")
     Switch(names, "Health % instead of aggro words", 12, -82, "healthText")
+    Switch(names, "Keep the aggro word beside it", 12, -108, "aggroWithHealth")
     RowLabel(names, "Bar texture", 284, -28)
     local tex = Dropdown(names, 140, TM.TEXTURE_KEYS, TM.TEXTURE_LABELS,
         function() return TM.db.barTexture end,
         function(v) TM.db.barTexture = v; TM:ApplyFonts() end)
     tex:SetPoint("TOPLEFT", 380, -28)
     AddRefresher(tex.Refresh)
+    RowLabel(names, "Aggro colors", 284, -60)
+    local colors = Dropdown(names, 140, TM.THREAT_PALETTE_KEYS, TM.THREAT_PALETTE_LABELS,
+        function() return TM.db.threatColors end,
+        function(v) TM.db.threatColors = v; TM:RefreshAll() end)
+    colors:SetPoint("TOPLEFT", 380, -60)
+    AddRefresher(colors.Refresh)
 
-    local text = Card(p, "Text size", 0, -130, PAGE_W, 80)
+    local text = Card(p, "Text size", 0, -156, PAGE_W, 80)
     FlatSlider(text, "Header", 12, -30, 244, "headerFontSize", 8, 20, nil, function() TM:ApplyFonts() end)
     FlatSlider(text, "Members", 284, -30, 244, "nameFontSize", 8, 20, nil, function() TM:ApplyFonts() end)
 end
 
 local function BuildAlertsTab(p)
-    local aggro = Card(p, "Aggro", 0, 0, 330, 170)
+    local aggro = Card(p, "Aggro", 0, 0, 330, 196)
     Switch(aggro, "Flash bar while they have aggro", 12, -30, "flashAggro")
-    Switch(aggro, "Play a sound", 12, -56, "aggroSound")
-    RowLabel(aggro, "Sound", 12, -84)
+    Switch(aggro, "Warn when you lose aggro on your target", 12, -56, "lostAggro", false, 270,
+        function() TM:CheckLostAggro() end)
+    Switch(aggro, "Play a sound", 12, -82, "aggroSound")
+    RowLabel(aggro, "Sound", 12, -110)
     local snd = Dropdown(aggro, 130, TM.AGGRO_SOUND_KEYS, TM.AGGRO_SOUND_LABELS,
         function() return TM.db.aggroSoundKey end,
         function(v) TM.db.aggroSoundKey = v; TM:TestAggroSound() end)
-    snd:SetPoint("TOPLEFT", 120, -82)
+    snd:SetPoint("TOPLEFT", 120, -108)
     AddRefresher(snd.Refresh)
     local test = FlatButton(aggro, "Test", 52)
     test:SetPoint("LEFT", snd, "RIGHT", 6, 0)
     test:SetScript("OnClick", function() TM:TestAggroSound() end)
-    RowLabel(aggro, "Alert when", 12, -112)
+    RowLabel(aggro, "Alert when", 12, -138)
     local lvl = Dropdown(aggro, 188, TM.AGGRO_LEVEL_KEYS, TM.AGGRO_LEVEL_LABELS,
         function() return TM.db.aggroSoundLevel end,
         function(v) TM.db.aggroSoundLevel = v end)
-    lvl:SetPoint("TOPLEFT", 120, -110)
+    lvl:SetPoint("TOPLEFT", 120, -136)
     AddRefresher(lvl.Refresh)
-    RowLabel(aggro, "Sound channel", 12, -140)
+    RowLabel(aggro, "Sound channel", 12, -166)
     local ch = Dropdown(aggro, 130, TM.SOUND_CHANNEL_KEYS, TM.SOUND_CHANNEL_LABELS,
         function() return TM.db.aggroSoundChannel end,
         function(v) TM.db.aggroSoundChannel = v; TM:TestAggroSound() end)
-    ch:SetPoint("TOPLEFT", 120, -138)
+    ch:SetPoint("TOPLEFT", 120, -164)
     AddRefresher(ch.Refresh)
 
     local reach = Card(p, "Reach", 340, 0, 200, 90)
@@ -695,7 +681,7 @@ local function BuildAlertsTab(p)
         function() TM:UpdateManaWarning() end)
     FlatSlider(mana, "Warn at", 12, -52, 176, "manaWarnPct", 5, 50, "%", function() TM:UpdateManaWarning() end)
 
-    local cd = Card(p, "Taunt cooldown icons", 0, -200, PAGE_W, 84)
+    local cd = Card(p, "Taunt cooldown icons", 0, -206, PAGE_W, 84)
     -- Mutually exclusive: turning one on turns the other off (both off hides the icons)
     local onCd, ready
     onCd = Switch(cd, "Show on cooldown", 12, -30, "cdShowOnCooldown", false, nil, function(v)
@@ -708,22 +694,31 @@ local function BuildAlertsTab(p)
     end)
     FlatSlider(cd, "Icon size", 284, -30, 244, "cdIconSize", 16, 64)
 
-    local plates = Card(p, "Nameplates", 0, -294, PAGE_W, 76)
+    local plates = Card(p, "Nameplates", 0, -300, PAGE_W, 76)
     Switch(plates, "Mark mobs attacking your party on their nameplates", 12, -30, "nameplateMarks",
         false, nil, function() TM:UpdatePlateMarks() end)
     MutedNote(plates, "Target the marked mob, then taunt it. Enemy nameplates must be on (V key).", 50, -52)
 end
 
 local function BuildGeneralTab(p)
-    local keys = Card(p, "Controller & keybindings", 0, 0, PAGE_W, 76)
+    local keys = Card(p, "Controller & keybindings", 0, 0, PAGE_W, 90)
     Switch(keys, "Show keybinding hints beside party bars", 12, -30, "keyHints")
-    MutedNote(keys, "Set keys or controller buttons in Options > Keybindings > TauntMaster Forever.", 50, -52)
+    MutedNote(keys, "Set keys or controller buttons in Options > Keybindings > TauntMaster Forever. "
+        .. "In raids, use Mouseover or Targeted ally.", 50, -52, PAGE_W - 62)
 
-    local other = Card(p, "Other", 0, -86, PAGE_W, 84)
+    local other = Card(p, "Other", 0, -100, PAGE_W, 110)
     Switch(other, "Show minimap icon", 12, -30, "minimap")
     Switch(other, "Show welcome screen after updates", 12, -56, "showSplash", false, nil, function() end)
+    -- Not a saved setting itself: it picks which settings this character uses
+    local own = T.LabeledSwitch(other, "This character uses its own settings", 12, -82)
+    local function paintOwn() own:SetOn(TM:UsesOwnSettings()) end
+    own:SetScript("OnClick", function()
+        TM:SetOwnSettings(not TM:UsesOwnSettings())
+        RunRefreshers()
+    end)
+    AddRefresher(paintOwn)
 
-    local cmds = Card(p, "Commands", 0, -180, PAGE_W, 116)
+    local cmds = Card(p, "Commands", 0, -220, PAGE_W, 116)
     local lines = {
         "|cff8fd3ff/tm|r  open or close these options",
         "|cff8fd3ff/tm toggle|r  show or hide the bars",
@@ -778,6 +773,25 @@ function TM:OpenConfig(page)
     win:Raise()
     local key = TAB_ALIASES[page] or page
     if pages[key] then win:ShowTab(key) end
+end
+
+-- "Custom spell..." in the spell picker: opens that click's row on the Click
+-- Bindings tab, ready to type in, with the same autocomplete and spell check
+EditCustomSpell = function(key)
+    TM:OpenConfig("bindings")
+    for _, row in ipairs(spellRows) do
+        if row.key == key then
+            if not SPELL_KINDS[row.kind] then
+                SetRowKind(row, "enemy")
+                row.cycle.Refresh()
+                UpdateRowStatus(row)
+            end
+            row.edit:SetFocus()
+            if bindingsMsg then
+                bindingsMsg:SetText("Type a spell for " .. row.label .. ", then click Save.")
+            end
+        end
+    end
 end
 
 TM._spellRows = spellRows

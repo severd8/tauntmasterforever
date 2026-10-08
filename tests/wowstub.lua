@@ -88,6 +88,7 @@ function Methods:SetText(t)
     self.__text = t
 end
 function Methods:SetFormattedText(fmt, ...)
+    self.__fmt = fmt
     for i = 1, select("#", ...) do if issecretvalue((select(i, ...))) then self.__text = "<secret fmt>" return end end
     self.__text = fmt:format(...)
 end
@@ -120,6 +121,7 @@ function Methods:SetTexCoord(...) self.__texcoord = { ... } end
 function Methods:SetFontString(fs) self.__fs = fs end
 function Methods:GetFontString() return self.__fs end
 function Methods:SetEnabled(v) self.__enabled = v end
+function Methods:SetFocus() self.__focus = true end
 
 function CreateFrame(kind, name, parent, template) return newObj(kind, name, parent, template) end
 UIParent = newObj("Frame", "UIParent")
@@ -208,6 +210,7 @@ for n, info in pairs(KNOWN) do info.name = n end
 -- Spells not in your spellbook: the real game only finds these by ID, not by name
 BY_ID_ONLY = { [694] = { spellID = 694, iconID = 6, name = "Mocking Blow" } }
 INSTANCE = false
+LOCAL_NAMES = {}
 function IsInInstance() return INSTANCE end
 -- Like the real game: spell lookup by name ignores capitalization
 local function lookup(n)
@@ -228,6 +231,8 @@ C_SpellBook = {
 }
 C_Spell = {
     GetSpellInfo = function(n) return lookup(n) end,
+    -- LOCAL_NAMES[id] = "Knurren": the spell's name on a non-English client
+    GetSpellName = function(id) if LOCAL_NAMES[id] then return LOCAL_NAMES[id] end local i = lookup(id) return i and i.name end,
     -- CD_ACTIVE: the spell is on cooldown. In secret mode the times are hidden but
     -- isActive / isOnGCD stay readable, like the real game.
     GetSpellCooldown = function(id)

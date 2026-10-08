@@ -14,10 +14,10 @@ It's a from-scratch rebuild of the classic *TauntMaster* addon, written for Fore
 - **Aggro at a glance.** Bars turn **yellow** (more threat than the tank), **orange** (being attacked) and **red** (has aggro). A faded bar means your taunt can't reach; a **red X** means that player has no enemy targeted.
 - **Nameplate marks.** The logo appears over any enemy that's attacking someone who isn't a tank. Click its nameplate, then taunt. Needs enemy nameplates (V key).
 - **Bind anything.** Left, Right and Middle click, each with Shift, Ctrl and Alt, to a spell, macro, assist or target, with a picker of your class's taunts. Keys and controller buttons work too.
-- **Alerts.** A flashing bar and an optional sound when someone pulls aggro, taunt cooldown icons, and a low mana warning for you and your healers.
+- **Alerts.** A flashing bar and an optional sound when someone pulls aggro, a warning on the header when a mob you were tanking turns away, taunt cooldown icons, and a low mana warning for you and your healers.
 - **Target's target bar and backup taunt.** Taunt what your target is hitting, or (optional) what a player's friendly target is fighting.
 - **Taunt announcements** (optional) in party, raid, instance, say or yell chat, with your own message.
-- **Raids and looks.** Raid bars grouped by raid group; health %, role icons, sort by role, bar textures, text sizes, class colors, and a tank-stance-only mode.
+- **Raids and looks.** Raid bars grouped by raid group; health %, role icons, sort by role, bar textures, text sizes, class colors, colorblind-friendly aggro colors, and a tank-stance-only mode.
 
 ## Installation
 
@@ -59,9 +59,9 @@ Settings are grouped into tabs down the left side of the options window:
 | **Taunts** | Left and Right Click spell pickers, taunt announcements, target's target bar, backup taunt |
 | **Click Bindings** | Every mouse button and modifier, with spell names or macros |
 | **Layout** | Bar size, columns, spacing, scale, lock, include yourself, show in raids, hide when solo, tank-stance-only mode, sort by role, reset position |
-| **Appearance** | Class colors, role icons, health %, bar texture, text sizes |
-| **Alerts** | Aggro flash and sound (sound choice with a Test button, when it plays, sound channel), reach fading, low mana warning, taunt cooldown icons, nameplate marks |
-| **General** | Keybinding hints, minimap icon, welcome screen, command list |
+| **Appearance** | Class colors, role icons, health % (optionally with the aggro word), bar texture, aggro colors (standard or colorblind-friendly), text sizes |
+| **Alerts** | Aggro flash, lost-aggro warning and sound (sound choice with a Test button, when it plays, sound channel), reach fading, low mana warning, taunt cooldown icons, nameplate marks |
+| **General** | Keybinding hints, minimap icon, welcome screen, separate settings for this character, command list |
 
 In a custom macro, `{unit}` is replaced with the clicked player (for example `/cast [@{unit}target] Growl`).
 
@@ -74,6 +74,7 @@ Prefer a controller, or keys instead of clicking? Go to **Options → Keybinding
 | **You / Party 1–4: Left Click spell** | Casts your Left Click spell on that player's target |
 | **You / Party 1–4: Right Click spell** | Casts your Right Click spell for that player |
 | **Targeted ally: Left / Right Click spell** | Target a friendly player, then press it to cast the spell on *their* target. Works in raids too. |
+| **Mouseover: Left / Right Click spell** | Point at a player (on raid frames or in the world), then press it to cast the spell on *their* target. Works in raids too. |
 
 Bound keys appear beside each party bar, so you always know which button saves whom. Turn the hints off on the **General** tab of the options.
 

@@ -5,6 +5,7 @@
 ## Version: @project-version@
 ## IconTexture: Interface\AddOns\TauntMasterForever\Media\logo
 ## SavedVariables: TauntMasterForeverDB
+## SavedVariablesPerCharacter: TauntMasterForeverCharDB
 ## X-License: MIT
 ## X-Curse-Project-ID: 1717418
 ## X-Category: Combat

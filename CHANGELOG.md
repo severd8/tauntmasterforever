@@ -1,3 +1,14 @@
+## 1.14.5
+
+- New: **lost aggro warning**. When a mob you were tanking (your target) turns to someone else, the header above the bars flashes red and says "Lost aggro!" for a few seconds, with your aggro sound if that's on. On by default; turn it off in the Alerts tab.
+- New: **Mouseover keybindings**. Point at a player on your raid frames or in the world and press the key to taunt what's attacking them. Set them in Options > Keybindings > TauntMaster Forever. Works in raids.
+- New: **colorblind-friendly aggro colors** (sky blue, orange, purple) in the Appearance tab.
+- New: **keep the aggro word beside the health %**, like "AGGRO 64%" (Appearance tab, with "Health % instead of aggro words").
+- New: **separate settings for one character**. Turn on "This character uses its own settings" in the General tab; it starts as a copy of your shared settings.
+- Your class taunts now use the spell names of your game's language, so players on non-English clients no longer see "not found" for the default taunts.
+- "Custom spell..." in the spell picker now opens that click on the Click Bindings tab, with autocomplete and the spell check, instead of a plain pop-up box.
+- Every chat line from the addon, including `/tm check` and the command list, now starts with the logo and name.
+
 ## 1.14.4
 
 - Same as 1.14.3, uploaded again under a new number. Nothing changes in the game.

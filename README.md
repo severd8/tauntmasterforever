@@ -100,7 +100,7 @@ WoW: Forever limits what addons can do in combat. TauntMaster Forever is built a
 - **A click taunts whatever that player has targeted.** Healers usually target a friend, so their bar shows a **red X** and there's nothing to taunt. Use the nameplate mark on the mob, the backup taunt, or your AoE taunt.
 - **Layout changes wait until combat ends.** Colors, text and alerts always update live.
 - **Say and Yell announcements** only work inside instances. **Raid Warning** needs leader or assist; without it, announcements go to raid chat.
-- **Tank-stance-only mode** does nothing for Paladins, who have no tank stance.
+- **Tank-stance-only mode** is for Warriors and Druids; it's greyed out for Paladins, who have no tank stance.
 
 ## Troubleshooting
 

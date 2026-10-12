@@ -102,7 +102,7 @@ WoW: Forever limits what addons can do in combat. TauntMaster Forever is built a
 - **Layout changes wait until combat ends.** Colors, text and alerts always update live.
 - **In some instances the game hides threat from addons.** The lost aggro warning then stays quiet rather than guess.
 - **Say and Yell announcements** only work inside instances. **Raid Warning** needs leader or assist; without it, announcements go to raid chat.
-- **Tank-stance-only mode** does nothing for Paladins, who have no tank stance.
+- **Tank-stance-only mode** is for Warriors and Druids; it's greyed out for Paladins, who have no tank stance.
 
 ## Troubleshooting
 

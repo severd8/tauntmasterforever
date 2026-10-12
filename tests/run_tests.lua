@@ -87,8 +87,9 @@ local function runScenario(label)
     STATE.threat.party2 = 0; tick()
     assertEq(p2.flashAnim.__playing, false, "flash stops")
     -- Cooldown modes
-    TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady = false, true; tick()
-    TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady = true, false; tick()
+    TM.db.cdMode = "ready"; tick()
+    TM.db.cdMode = "never"; tick()
+    TM.db.cdMode = "cooldown"; tick()
     -- Raid
     STATE.inRaid = true
     for i = 1, 10 do STATE.unitsExist["raid" .. i] = true; STATE.roles["raid" .. i] = (i == 3) and "HEALER" or "DAMAGER" end
@@ -202,15 +203,6 @@ end)
 print("clicked", clicked, "slid", slid)
 assert(clicked > 40 and slid >= 7, "expected all controls to be exercised")
 
--- Cooldown options stay exclusive
-TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady = true, false
-walk(win, function(f)
-    if f.__kind == "CheckButton" then
-        for _, r in ipairs(f.__parent.__children) do
-            if r.__kind == "FontString" and r.__text == "Show When Ready" and r.__parent == f.__parent then end
-        end
-    end
-end)
 
 step("spell picker menu")
 MENUS = {}
@@ -235,9 +227,9 @@ local customRow
 for _, row in ipairs(TM._spellRows) do if row.key == "1" then customRow = row end end
 assertEq(customRow.kind, "enemy", "row switched to a spell on their target")
 assertEq(customRow.edit.__focus, true, "spell box focused")
-assert(TM._bindingsMsg:GetText():find("then click Save"), "tells you to save")
+assert(TM._bindingsMsg:GetText():find("press Enter"), "tells you how to save")
 customRow.edit:SetText("  Taunt  ")
-walk(win, function(f) if f.__kind == "Button" and f.__text == "Save" then f.__scripts.OnClick(f) end end)
+customRow.edit.__scripts.OnEnterPressed(customRow.edit)
 assertEq(TM:GetBindings()["1"].text, "Taunt", "custom spell trimmed and saved")
 assertEq(TM:GetBindings()["1"].kind, "enemy", "custom spell cast on their target")
 TM.db.bindings.DRUID = TM:DefaultBindings(); TM:ApplyBindings()
@@ -316,14 +308,13 @@ TauntMasterForeverConfig.__scripts.OnShow(TauntMasterForeverConfig)
 assert(TM._bindingsMsg:GetText():find("Right %(not found%)"), "summary lists bad bindings: " .. TM._bindingsMsg:GetText())
 TM.db.bindings.DRUID = TM:DefaultBindings()
 TauntMasterForeverConfig.__scripts.OnShow(TauntMasterForeverConfig)
-assertEq(TM._bindingsMsg:GetText(), "", "no message when everything is fine")
+assert(TM._bindingsMsg:GetText():find("saved as you make them"), "only the macro tips when everything is fine")
 -- Saving fixes capitalization
 type_(left, "growl")
 assertEq(left.statusState, "ok", "lowercase name still validates")
-for _, f in ipairs(ALL_FRAMES) do
-    if f.__kind == "Button" and f.__text == "Save" and f.__scripts.OnClick then f.__scripts.OnClick(f) end
-end
+left.edit.__scripts.OnEditFocusLost(left.edit)   -- leaving the box saves it
 assertEq(TM:GetBindings()["1"].text, "Growl", "saved with the game's spelling")
+assertEq(left.edit:GetText(), "Growl", "and the box shows the game's spelling")
 -- Macro rows get no status icon or suggestions
 local macroRow = rows[2]
 macroRow.cycle.__scripts.OnClick(macroRow.cycle)  -- cycle kind forward
@@ -478,9 +469,14 @@ assert(issecretvalue(p1.noTarget.__alpha) and p1.noTarget.__alpha.v == 1, "secre
 assert(issecretvalue(p1.bar.__alpha) and p1.bar.__alpha.v == 0.35, "secret dim")
 assert(issecretvalue(p2.noTarget.__alpha) and p2.noTarget.__alpha.v == 0, "secret marker hidden")
 SECRET_MODE = false
--- Turning the option off clears both
+-- Fading and the red X are switched separately
 TM.db.rangeFade = false; refresh()
-assertEq(p1.bar.__alpha, 1, "option off: bright"); assertEq(p1.noTarget.__alpha, 0, "option off: no marker")
+assertEq(p1.bar.__alpha, 1, "fade off: bright"); assertEq(p1.noTarget.__alpha, 1, "fade off: the red X stays")
+TM.db.rangeFade, TM.db.noTargetMark = true, false; refresh()
+assertEq(p1.bar.__alpha, 0.35, "red X off: still fades"); assertEq(p1.noTarget.__alpha, 0, "red X off: no marker")
+TM.db.rangeFade = false; refresh()
+assertEq(p1.bar.__alpha, 1, "both off: bright"); assertEq(p1.noTarget.__alpha, 0, "both off: no marker")
+TM.db.noTargetMark = true
 -- Left Click not a learned targeted taunt: falls back to distance, no marker
 TM.db.rangeFade = true; TM:GetBindings()["1"] = { kind = "enemy", text = "Taunt" }; refresh()
 assertEq(p1.noTarget.__alpha, 0, "unlearned taunt: no marker")
@@ -576,23 +572,13 @@ walk(cfg, function(f) if f.isSwitch and not soloSwitch then
 end end)
 assert(soloSwitch, "Hide when solo switch found")
 soloSwitch.__scripts.OnClick(soloSwitch)
--- Cooldown switches stay exclusive
-TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady = true, false
-local cdSwitches = {}
-walk(cfg, function(f) if f.isSwitch then cdSwitches[#cdSwitches + 1] = f end end)
-for _, f in ipairs(cdSwitches) do
-    local a, b = TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady
-    f.__scripts.OnClick(f)
-    if TM.db.cdShowWhenReady and not b then
-        assertEq(TM.db.cdShowOnCooldown, false, "turning on 'when ready' turns off 'on cooldown'")
-        f.__scripts.OnClick(f)                 -- off again
-        TM.db.cdShowOnCooldown = true
-    elseif (TM.db.cdShowOnCooldown ~= a) or (TM.db.cdShowWhenReady ~= b) then
-        f.__scripts.OnClick(f)                 -- not a cooldown switch here; put it back
-    else
-        f.__scripts.OnClick(f)
-    end
-end
+-- Taunt cooldown icons: one choice instead of two switches that turned each other off
+local cdChoice
+walk(cfg, function(f) if f.__kind == "Button" and f.Choose and f.keys == TM.CD_MODE_KEYS then cdChoice = f end end)
+assert(cdChoice, "cooldown icon choice found")
+cdChoice.Choose("never"); assertEq(TM.db.cdMode, "never", "Never saved")
+assertEq(cdChoice.__text, "Never", "and shown")
+cdChoice.Choose("cooldown")
 -- Dropdowns open a menu; picking an item saves it
 MENUS = {}
 local chanDropdown
@@ -610,13 +596,15 @@ local labels = {}
 walk(cfg, function(f) if f.__kind == "FontString" and f.__text then labels[f.__text] = true end end)
 assert(labels["Sound channel"] and not labels["Volume slider"], "sound channel label")
 assert(labels["Show welcome screen after updates"], "welcome screen switch present")
--- Scale slider moves in 0.05 steps
-local scaleOk = false
-walk(cfg, function(f) if f.__kind == "Slider" then
-    f.__scripts.OnValueChanged(f, 1.23)
-    if TM.db.scale and math.abs(TM.db.scale - 1.25) < 0.001 then scaleOk = true end
-end end)
-assert(scaleOk, "scale slider rounds to 0.05")
+-- Scale is shown as a percentage and moves in 5% steps
+local scaleSlider
+walk(cfg, function(f) if f.__kind == "Slider" and f.title and f.title:GetText() == "Scale" then scaleSlider = f end end)
+assert(scaleSlider, "scale slider found")
+scaleSlider.__scripts.OnValueChanged(scaleSlider, 123)
+assert(math.abs(TM.db.scale - 1.25) < 0.001, "scale rounds to 5%: " .. TM.db.scale)
+assertEq(scaleSlider.valueText:GetText(), "125%", "shown as a percentage")
+scaleSlider.__scripts.OnValueChanged(scaleSlider, 900)
+assertEq(TM.db.scale, 2, "never above the limit")
 TM.db.scale = 1; TM.db.width = 120; TM.db.height = 24; TM.db.unitsPerColumn = 5; TM.db.maxColumns = 8
 TM.db.spacing = 2; TM.db.headerFontSize = 10; TM.db.nameFontSize = 10; TM.db.cdIconSize = 26; TM.db.manaWarnPct = 20
 TM:ApplySettings()
@@ -752,7 +740,7 @@ SECRET_MODE = false
 step("cooldown icons in instances (hidden times)")
 local icon = TM.cdIcons[1]
 local function cdShown(onCd, ready, active, gcd)
-    TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady = onCd, ready
+    TM.db.cdMode = onCd and "cooldown" or (ready and "ready" or "never")
     CD_ACTIVE, CD_GCD = active, gcd
     SECRET_MODE = true; TM:UpdateCooldowns(); SECRET_MODE = false
     return icon.__shown
@@ -778,7 +766,9 @@ cdShown(true, false, true, false)
 assertEq(table.concat(swipes, ","), "times", "and the times are the fallback if it fails")
 C_Spell.GetSpellCooldownDuration, icon.cd.SetCooldownFromDurationObject, icon.cd.SetCooldown = nil, nil, nil
 CD_ACTIVE, CD_GCD = nil, nil
-TM.db.cdShowOnCooldown, TM.db.cdShowWhenReady = true, false
+TM.db.cdMode = "cooldown"
+assertEq(cdShown(false, false, true, false), false, "Never: hidden even on cooldown")
+TM.db.cdMode = "cooldown"
 SECRET_MODE = true; SlashCmdList.TAUNTMASTERFOREVER("debug"); SECRET_MODE = false
 step("backup taunt (no enemy targeted)")
 STATE.class = "DRUID"; TM.db.bindings.DRUID = TM:DefaultBindings()
@@ -1084,7 +1074,7 @@ TM.db.healthText, TM.db.aggroWithHealth = false, false; tick()
 TM:OpenConfig("appearance")
 local seen = {}
 walk(win, function(f) if f.__text then seen[f.__text] = true end end)
-assert(seen["Keep the aggro word beside it"] and seen["Aggro colors"] and seen["Standard"], "appearance controls")
+assert(seen["Aggro word with the health %"] and seen["Aggro colors"] and seen["Standard"], "appearance controls")
 assert(seen["Warn when you lose aggro on your target"], "lost aggro switch")
 assert(seen["This character uses its own settings"], "own settings switch")
 TM:OpenConfig()
@@ -1167,4 +1157,231 @@ assertEq(TM.pending, nil, "applied after the fight")
 assertEq((pos("raid6")), TM.db.width + TM.db.spacing, "raid6 laid out in group 2's column")
 STATE.inGroup, STATE.inRaid, STATE.party = false, false, 0; RAID_GROUPS = {}
 STATE.unitsExist = { player = true }; fire("GROUP_ROSTER_UPDATE")
+
+-- Closing the window the way the game does: hidden, then its OnHide runs
+local function closeWin() win:Hide(); win.__scripts.OnHide(win) end
+
+step("options: every card fits its page, every control explains itself")
+TM:OpenConfig("taunts")
+local PAGE_W = ns.Theme.WINDOW.W - ns.Theme.WINDOW.SIDE - 32
+for key, page in pairs(TM._tabs.pages) do
+    for _, card in ipairs(page.body.__children) do
+        if card.title then
+            local x, y = card.__pos[1], card.__pos[2]
+            local w, h = card.__size[1], card.__size[2]
+            assert(x + w <= PAGE_W, key .. ": card wider than the page: " .. card.title:GetText())
+            assert(-y + h <= ns.Theme.WINDOW.BODY_H, key .. ": card runs off the bottom: " .. card.title:GetText())
+        end
+    end
+end
+local untipped = {}
+walk(win, function(f)
+    local control = f.isSwitch or (f.__kind == "Slider" and f.title) or (f.__kind == "Button" and rawget(f, "Choose"))
+    if control and not f.__scripts.OnEnter then
+        local where = f.__parent and f.__parent.title and f.__parent.title:GetText() or "?"
+        untipped[#untipped + 1] = where .. "/" .. f.__kind .. "/" .. tostring((f.label and f.label:GetText()) or (f.title and f.title:GetText()) or f.__text)
+    end
+end)
+assertEq(#untipped, 0, "controls without hover help: " .. table.concat(untipped, ", "))
+
+step("options: click bindings save as you go")
+TM:OpenConfig("bindings")
+local brow = TM._spellRows[2]
+brow.cycle.Choose("target")
+assertEq(TM:GetBindings()["2"].kind, "target", "picking an action saves it at once")
+assertEq(TM.unitToButton.party1.__attrs.type2, "target", "and the bars use it")
+brow.cycle.Choose("enemy")
+brow.edit:SetText("Growl")             -- typed, not yet confirmed
+closeWin()                             -- closing the window keeps it
+assertEq(TM:GetBindings()["2"].text, "Growl", "text still being typed is saved when the window closes")
+TM:OpenConfig("bindings")
+assertEq(brow.kind, "enemy", "reopening shows what was saved")
+-- Class defaults needs a second click
+TM:GetBindings()["1"] = { kind = "macro", text = "/wave" }
+local defaultsBtn
+walk(win, function(f) if f.__kind == "Button" and f.__text == "Class defaults" then defaultsBtn = f end end)
+local realAfter = C_Timer.After
+C_Timer.After = function() end
+defaultsBtn.__scripts.OnClick(defaultsBtn)
+assertEq(TM:GetBindings()["1"].kind, "macro", "one click doesn't reset")
+assertEq(defaultsBtn.__text, "Click again", "asks for a second click")
+defaultsBtn.__scripts.OnClick(defaultsBtn)
+assertEq(TM:GetBindings()["1"].text, "Growl", "the second click resets")
+C_Timer.After = realAfter
+-- The lower rows open their suggestions upward, inside the window
+local lowRow = TM._spellRows[#TM._spellRows]
+lowRow.kind = "enemy"; lowRow.edit:SetText("gro"); lowRow.edit.__scripts.OnTextChanged(lowRow.edit, true)
+assertEq(TM._suggest().__shown, true, "suggestions for the bottom row")
+lowRow.edit.__scripts.OnEscapePressed(lowRow.edit)
+TM.db.bindings.DRUID = TM:DefaultBindings(); TM:ApplyBindings()
+
+step("options: show the bars, lock, and changes made elsewhere")
+local function findSwitch(text)
+    local found
+    walk(win, function(f) if f.isSwitch and f.label and f.label:GetText() == text then found = f end end)
+    return found
+end
+TM:OpenConfig("layout")
+local showSw, lockSw = findSwitch("Show the bars"), findSwitch("Lock bars")
+assert(showSw and lockSw, "show and lock switches")
+local logged = #LOG
+showSw.__scripts.OnClick(showSw)
+assertEq(TM.db.shown, false, "the switch hides the bars")
+assertEq(TM.main.__driver, "hide", "hidden")
+showSw.__scripts.OnClick(showSw)
+assertEq(TM.db.shown, true, "and shows them again")
+lockSw.__scripts.OnClick(lockSw); lockSw.__scripts.OnClick(lockSw)
+for i = logged + 1, #LOG do assert(not LOG[i]:find("locked%.") and not LOG[i]:find("shown%."), "switches don't chat: " .. LOG[i]) end
+SlashCmdList.TAUNTMASTERFOREVER("hide")
+assertEq(showSw.on, false, "/tm hide repaints the open window")
+SlashCmdList.TAUNTMASTERFOREVER("show")
+SlashCmdList.TAUNTMASTERFOREVER("lock")
+assertEq(lockSw.on, true, "/tm lock repaints the open window")
+SlashCmdList.TAUNTMASTERFOREVER("unlock")
+
+step("options: greyed-out settings")
+local wordSw = findSwitch("Aggro word with the health %")
+TM.db.healthText = false
+TM:OpenConfig("appearance"); closeWin(); TM:OpenConfig("appearance")
+assertEq(wordSw.disabled, true, "aggro word greyed out without health %")
+local before = TM.db.aggroWithHealth
+wordSw.__scripts.OnClick(wordSw)
+assertEq(TM.db.aggroWithHealth, before, "a greyed-out switch does nothing")
+local hpSw = findSwitch("Health % instead of aggro words")
+hpSw.__scripts.OnClick(hpSw)
+assertEq(wordSw.disabled, false, "turning on health % enables it at once")
+hpSw.__scripts.OnClick(hpSw)
+local tankSw = findSwitch("Only in tank stance or form")
+assertEq(tankSw.disabled, false, "druids have a tank form")
+STATE.class = "PALADIN"; closeWin(); TM:OpenConfig("layout")
+assertEq(tankSw.disabled, true, "paladins have no tank stance")
+STATE.class = "DRUID"; closeWin(); TM:OpenConfig("layout")
+local manaSlider
+walk(win, function(f) if f.__kind == "Slider" and f.title and f.title:GetText() == "Warn at" then manaSlider = f end end)
+TM.db.hideManaWarning = true; closeWin(); TM:OpenConfig("alerts")
+assertEq(manaSlider.disabled, true, "warn-at slider greyed out with the warning off")
+TM.db.hideManaWarning = false; closeWin(); TM:OpenConfig("alerts")
+assertEq(manaSlider.disabled, false, "and back")
+
+step("layout: no party bar is cut off; raid options")
+STATE.inGroup, STATE.inRaid, STATE.party = true, false, 4
+STATE.unitsExist = { player = true, party1 = true, party2 = true, party3 = true, party4 = true }
+TM.db.unitsPerColumn, TM.db.maxColumns = 1, 3; TM:Layout()
+for _, b in ipairs(TM.partyButtons) do assert(b.__shown ~= false or b.unit == "player", "party bar hidden: " .. b.unit) end
+assertEq(TM.unitToButton.party4.__pos[1], 4 * (TM.db.width + TM.db.spacing), "fifth bar in its own column")
+TM.db.unitsPerColumn, TM.db.maxColumns = 5, 8
+TM.db.showInRaid = false; TM:ApplySettings()
+assertEq(TM.partyFrame.__driver, "show", "raid bars off: your party's bars still show in a raid")
+assertEq(TM.raidFrame.__driver, "hide", "and the raid bars don't")
+TM.db.showInRaid = true; TM:ApplySettings()
+assertEq(TM.partyFrame.__driver, "[group:raid] hide; show", "raid bars on: party bars give way")
+-- Include yourself applies to your raid bar too
+STATE.inRaid = true
+STATE.unitsExist = { player = true, raid1 = true, raid2 = true, raid3 = true }
+local realIsUnit = UnitIsUnit
+UnitIsUnit = function(a, b) if a == "raid2" and b == "player" then return true end return realIsUnit(a, b) end
+TM.db.showPlayer = false; TM:Layout()
+assertEq(TM.unitToButton.raid2.__shown, false, "your raid bar is left out")
+assertEq(TM.unitToButton.raid3.__pos[2], -1 * (TM.db.height + TM.db.spacing), "the next one moves up")
+TM.db.showPlayer = true; TM:Layout()
+UnitIsUnit = realIsUnit
+STATE.inGroup, STATE.inRaid, STATE.party = false, false, 0; STATE.unitsExist = { player = true }; TM:Layout()
+
+step("layout preview")
+TM:OpenConfig("layout")
+local previewBtn
+walk(win, function(f) if f.__kind == "Button" and (f.__text == "Preview bars" or f.__text == "Hide preview") then previewBtn = f end end)
+if TM.previewOn then previewBtn.__scripts.OnClick(previewBtn) end
+previewBtn.__scripts.OnClick(previewBtn)
+assertEq(TM.previewOn, true, "preview on")
+assertEq(previewBtn.__text, "Hide preview", "button says how to turn it off")
+local shownBars = 0
+for _, f in ipairs(TM.previewBars) do if f.__shown then shownBars = shownBars + 1 end end
+assertEq(shownBars, 5, "five sample bars")
+assertEq(TM.previewBars[2].__pos[2], -(TM.db.height + TM.db.spacing), "placed like the real bars")
+TM.db.showPlayer = false; TM:UpdatePreview()
+assertEq(TM.previewBars[1].__shown, false, "no sample bar for you when you're left out")
+TM.db.showPlayer = true
+COMBAT = true; BLOCKED = {}
+TM.db.width = 150; TM:Layout()
+assertEq(TM.previewBars[1].__size[1], 150, "follows the sliders even in combat")
+assertEq(#BLOCKED, 0, "without touching protected frames")
+COMBAT = false; fire("PLAYER_REGEN_ENABLED"); TM.db.width = 120; TM:Layout()
+closeWin()
+assertEq(TM.previewOn, false, "closing the options ends the preview")
+for _, f in ipairs(TM.previewBars) do assertEq(f.__shown, false, "sample bars hidden") end
+
+step("options: reset buttons, announcements test, combat notice")
+TM:OpenConfig("layout")
+TM.db.width, TM.db.spacing = 77, 9
+local sizeReset
+walk(win, function(f) if f.__kind == "Button" and f.__text == "Reset" and f.__parent.title and f.__parent.title:GetText() == "SIZE" then sizeReset = f end end)
+sizeReset.__scripts.OnClick(sizeReset)
+assertEq(TM.db.width, 120, "Reset puts the width back"); assertEq(TM.db.spacing, 2, "and the spacing")
+TM:OpenConfig("taunts")
+local annTest
+walk(win, function(f) if f.__kind == "Button" and f.__text == "Test" and f.__parent.title and f.__parent.title:GetText() == "ANNOUNCEMENTS" then annTest = f end end)
+TM.db.announceChannel = "PARTY"; CHAT = {}
+local from = #LOG
+annTest.__scripts.OnClick(annTest)
+assertEq(#CHAT, 0, "the test sends nothing")
+assert(LOG[#LOG]:find("Defias Thug has been taunted off of Aeri!"), "it shows the message: " .. LOG[#LOG])
+-- An emptied message goes back to the default
+local annBox
+walk(win, function(f) if f.__kind == "EditBox" and f.__parent.title and f.__parent.title:GetText() == "ANNOUNCEMENTS" then annBox = f end end)
+annBox:SetText("   "); annBox.__scripts.OnTextChanged(annBox, true); annBox.__scripts.OnEditFocusLost(annBox)
+assertEq(TM.db.announceText, TM.DEFAULTS.announceText, "an empty message goes back to the default")
+-- Raid Warning without rank goes to raid chat
+STATE.inGroup, STATE.inRaid = true, true; CHAT = {}
+TM.db.announceChannel = "RAID_WARNING"
+TM:SendAnnounce("Mob", "Ally")
+assert(CHAT[1] and CHAT[1]:find("^RAID:"), "no rank: raid chat " .. tostring(CHAT[1]))
+UnitIsGroupLeader = function() return true end; CHAT = {}
+TM:SendAnnounce("Mob", "Ally")
+assert(CHAT[1] and CHAT[1]:find("^RAID_WARNING:"), "leader: raid warning")
+UnitIsGroupLeader = nil; TM.db.announceChannel = "none"; STATE.inGroup, STATE.inRaid = false, false
+-- In combat, the "will apply" line is said once per fight
+COMBAT = true; from = #LOG
+for _ = 1, 4 do TM:ApplySettings() end
+local notices = 0
+for i = from + 1, #LOG do if LOG[i]:find("leave combat") then notices = notices + 1 end end
+assertEq(notices, 1, "said once per fight")
+COMBAT = false; fire("PLAYER_REGEN_ENABLED")
+from = #LOG
+COMBAT = true; TM:ApplySettings(); COMBAT = false; fire("PLAYER_REGEN_ENABLED")
+notices = 0
+for i = from + 1, #LOG do if LOG[i]:find("leave combat") then notices = notices + 1 end end
+assertEq(notices, 1, "and said again in the next fight")
+closeWin()
+
+step("saved settings: old cooldown switches, bad choices and numbers")
+local keep = TauntMasterForeverDB
+TauntMasterForeverDB = { schema = 3, cdShowOnCooldown = false, cdShowWhenReady = true, aggroSoundLevel = 7,
+    announceChannel = "GUILD", barTexture = "shiny", width = 999, scale = 0.1, announceText = "" }
+TauntMasterForeverCharDB = {}
+fire("ADDON_LOADED", ADDON)
+assertEq(TM.db.cdMode, "ready", "Show when ready becomes When ready")
+assertEq(TM.db.cdShowOnCooldown, nil, "old switch removed")
+assertEq(TM.db.aggroSoundLevel, 2, "unknown sound level back to default")
+assertEq(TM.db.announceChannel, "none", "unknown channel back to default")
+assertEq(TM.db.barTexture, "blizzard", "unknown texture back to default")
+assertEq(TM.db.width, 200, "too wide brought into range")
+assertEq(TM.db.scale, 0.5, "too small brought into range")
+assertEq(TM.db.announceText, TM.DEFAULTS.announceText, "empty announcement back to default")
+TauntMasterForeverDB = { schema = 3, cdShowOnCooldown = false, cdShowWhenReady = false }
+fire("ADDON_LOADED", ADDON)
+assertEq(TM.db.cdMode, "never", "both off becomes Never")
+TauntMasterForeverDB = keep
+fire("ADDON_LOADED", ADDON)
+TM:ApplySettings()
+
+step("general tab lists every command")
+TM:OpenConfig("general")
+local shownCmds = 0
+walk(win, function(f) if f.__kind == "FontString" and f.__text and f.__text:find("^|cff8fd3ff/tm") then shownCmds = shownCmds + 1 end end)
+assertEq(shownCmds, #TM.COMMANDS, "one line per command")
+local from2 = #LOG
+SlashCmdList.TAUNTMASTERFOREVER("help")
+assertEq(#LOG - from2, #TM.COMMANDS + 1, "/tm help lists the same commands")
+closeWin()
 print("ALL TESTS PASSED")

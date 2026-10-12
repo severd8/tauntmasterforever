@@ -185,6 +185,7 @@ local DEFAULTS = {
     threatColors = "standard",
     keyHints = true,
     rangeFade = true,
+    noTargetMark = true,     -- red X beside players with no enemy targeted
     roleIcons = true,
     showToT = false,
     tauntFallback = false,   -- no enemy targeted: taunt what their target is fighting
@@ -192,13 +193,22 @@ local DEFAULTS = {
     tankOnly = false,
     barTexture = "blizzard",
     manaWarnPct = 20,
-    cdShowOnCooldown = true,
-    cdShowWhenReady = false,
+    cdMode = "cooldown",     -- taunt cooldown icons: "cooldown", "ready" or "never"
     cdIconSize = 26,
     announceChannel = "none",
     announceText = "{target} has been taunted off of {player}!",
     point = { "CENTER", "CENTER", -300, 0 },
     bindings = {},
+}
+
+TM.DEFAULTS = DEFAULTS
+
+-- Allowed range for each number setting; the options sliders use these too
+TM.LIMITS = {
+    width = { 50, 200 }, height = { 20, 60 }, spacing = { 0, 10 },
+    unitsPerColumn = { 1, 20 }, maxColumns = { 1, 8 }, scale = { 0.5, 2 },
+    headerFontSize = { 8, 20 }, nameFontSize = { 8, 20 },
+    manaWarnPct = { 5, 50 }, cdIconSize = { 16, 64 },
 }
 
 -- Fills in missing settings. A saved value of the wrong type (a damaged or
@@ -227,10 +237,33 @@ local function PrepareSettings(db)
         end
         db.schema = 3
     end
-    -- Older versions allowed both cooldown modes at once
-    if db.cdShowOnCooldown and db.cdShowWhenReady then
-        db.cdShowWhenReady = false
+    if db.schema < 4 then
+        -- Two cooldown icon switches became one choice
+        if db.cdShowOnCooldown == false and db.cdShowWhenReady == true then
+            db.cdMode = "ready"
+        elseif db.cdShowOnCooldown == false and db.cdShowWhenReady == false then
+            db.cdMode = "never"
+        end
+        db.cdShowOnCooldown, db.cdShowWhenReady = nil, nil
+        db.schema = 4
     end
+    -- A choice that isn't on its list (an old or damaged file) goes back to its default
+    local choices = {
+        aggroSoundKey = TM.AGGRO_SOUND_KEYS, aggroSoundLevel = TM.AGGRO_LEVEL_KEYS,
+        aggroSoundChannel = TM.SOUND_CHANNEL_KEYS, announceChannel = TM.ANNOUNCE_CHANNELS,
+        barTexture = TM.TEXTURE_KEYS, threatColors = TM.THREAT_PALETTE_KEYS, cdMode = TM.CD_MODE_KEYS,
+    }
+    for key, list in pairs(choices) do
+        local ok = false
+        for _, v in ipairs(list) do if v == db[key] then ok = true break end end
+        if not ok then db[key] = DEFAULTS[key] end
+    end
+    -- Numbers outside their range are brought back inside it
+    for key, r in pairs(TM.LIMITS) do
+        db[key] = math.max(r[1], math.min(r[2], db[key]))
+    end
+    -- An empty announcement would silently send nothing
+    if db.announceText:match("^%s*$") then db.announceText = DEFAULTS.announceText end
     return db
 end
 
@@ -483,7 +516,7 @@ for _, s in ipairs(TM.AGGRO_SOUNDS) do
     TM.AGGRO_SOUND_LABELS[s.key] = s.label
 end
 TM.AGGRO_LEVEL_KEYS = { 1, 2, 3 }
-TM.AGGRO_LEVEL_LABELS = { "Close to pulling (yellow)", "Has aggro (orange/red)", "Firmly has aggro (red)" }
+TM.AGGRO_LEVEL_LABELS = { "Close to pulling (yellow)", "Has aggro (orange or red)", "Firmly has aggro (red)" }
 TM.SOUND_CHANNEL_KEYS = { "Master", "SFX", "Dialog" }
 TM.SOUND_CHANNEL_LABELS = { Master = "Master", SFX = "Sound Effects", Dialog = "Dialog" }
 
@@ -676,8 +709,11 @@ function TM:UpdateButton(btn)
 
     -- Range fade (bar only; the secure button itself is never touched in combat).
     -- The alpha may be secret, so it's never truth-tested.
+    -- Fading and the red X come from the same check but are switched separately
     local alpha, marker = 1, 0
-    if db.rangeFade then alpha, marker = self:RangeState(btn) end
+    if db.rangeFade or db.noTargetMark then alpha, marker = self:RangeState(btn) end
+    if not db.rangeFade then alpha = 1 end
+    if not db.noTargetMark then marker = 0 end
     pcall(btn.bar.SetAlpha, btn.bar, alpha)
     pcall(btn.bg.SetAlpha, btn.bg, alpha)
     if not pcall(btn.noTarget.SetAlpha, btn.noTarget, marker) then btn.noTarget:SetAlpha(0) end
@@ -896,6 +932,9 @@ end
 ---------------------------------------------------------------------------
 -- Taunt cooldown icons (Left and Right Click spells), in a row above the header
 ---------------------------------------------------------------------------
+TM.CD_MODE_KEYS = { "cooldown", "ready", "never" }
+TM.CD_MODE_LABELS = { cooldown = "While on cooldown", ready = "When ready", never = "Never" }
+
 function TM:BuildCooldownIcons()
     self.cdIcons = {}
     for i, key in ipairs({ "1", "2" }) do
@@ -925,7 +964,7 @@ function TM:UpdateCooldowns()
         local bind = bindings[b.key]
         local spell = bind and self.SPELL_KINDS[bind.kind] and bind.text ~= "" and bind.text
         local info = spell and C_Spell and C_Spell.GetSpellInfo(spell)
-        if not info or not (db.cdShowOnCooldown or db.cdShowWhenReady) then
+        if not info or db.cdMode == "never" then
             b:Hide()
         else
             b.icon:SetTexture(info.iconID)
@@ -964,8 +1003,8 @@ function TM:UpdateCooldowns()
             end
             b.icon:SetDesaturated(state == "cd")
             b:SetShown(state == "unknown"
-                or (state == "cd" and db.cdShowOnCooldown)
-                or (state == "ready" and db.cdShowWhenReady))
+                or (state == "cd" and db.cdMode == "cooldown")
+                or (state == "ready" and db.cdMode == "ready"))
         end
     end
 end
@@ -1193,6 +1232,14 @@ function TM:SendAnnounce(target, player)
     -- Skip channels you can't talk in right now instead of showing an error
     if chat == "PARTY" and not IsInGroup() then return end
     if (chat == "RAID" or chat == "RAID_WARNING") and not IsInRaid() then return end
+    -- Raid warnings need leader or assist; without them the message goes to raid chat
+    if chat == "RAID_WARNING" then
+        local lead = UnitIsGroupLeader and UnitIsGroupLeader("player")
+        local assist = UnitIsGroupAssistant and UnitIsGroupAssistant("player")
+        if IsSecret(lead) then lead = false end
+        if IsSecret(assist) then assist = false end
+        if not (lead or assist) then chat = "RAID" end
+    end
     if chat == "INSTANCE_CHAT" and not IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then return end
     -- Outside instances the game blocks addon Say/Yell that isn't a direct key press
     if (chat == "SAY" or chat == "YELL") and not (IsInInstance and IsInInstance()) then return end
@@ -1325,26 +1372,38 @@ function TM:SortedByRole(list)
     return out
 end
 
+-- Where the idx-th shown party bar goes (0-based): a new column every "Bars per
+-- column". The column limit is for raid groups only, so no party bar is ever cut off.
+function TM:PartySlot(idx)
+    local upc = self.db.unitsPerColumn
+    return math.floor(idx / upc), idx % upc
+end
+
 function TM:LayoutGroup(list, parent)
     local db = self.db
     if db.sortByRole then list = self:SortedByRole(list) end
     local w, h, s = db.width, db.height, db.spacing
-    local upc, maxCols = db.unitsPerColumn, db.maxColumns
     local idx = 0
     for _, btn in ipairs(list) do
         btn:SetSize(w, h)
         btn:ClearAllPoints()
-        local col = math.floor(idx / upc)
-        if (btn.unit == "player" and not db.showPlayer) or col >= maxCols then
+        if btn.unit == "player" and not db.showPlayer then
             UnregisterUnitWatch(btn)
             btn:Hide()
         else
             RegisterUnitWatch(btn)
-            btn:SetPoint("TOPLEFT", parent, "TOPLEFT", col * (w + s), -(idx % upc) * (h + s))
+            local col, row = self:PartySlot(idx)
+            btn:SetPoint("TOPLEFT", parent, "TOPLEFT", col * (w + s), -row * (h + s))
             idx = idx + 1
         end
     end
     parent:SetSize(1, 1)
+end
+
+-- Your own bar, when it can be told (the game can hide who's who)
+local function IsMe(unit)
+    local me = UnitIsUnit(unit, "player")
+    return not IsSecret(me) and me == true
 end
 
 -- Raid bars are laid out by raid group: each group gets its own column (or row, when
@@ -1377,20 +1436,21 @@ function TM:LayoutRaid()
     for _, g in ipairs(order) do
         local list = buckets[g]
         if db.sortByRole then list = self:SortedByRole(list) end
-        for pos, btn in ipairs(list) do
+        local p = 0   -- position in the group, skipping your own bar when it's left out
+        for _, btn in ipairs(list) do
             btn:SetSize(w, h)
             btn:ClearAllPoints()
-            if block >= db.maxColumns then
+            if block >= db.maxColumns or (not db.showPlayer and IsMe(btn.unit)) then
                 UnregisterUnitWatch(btn)
                 btn:Hide()
             else
                 RegisterUnitWatch(btn)
-                local p = pos - 1
                 if horizontal then
                     btn:SetPoint("TOPLEFT", self.raidFrame, "TOPLEFT", p * (w + s), -block * (h + s))
                 else
                     btn:SetPoint("TOPLEFT", self.raidFrame, "TOPLEFT", block * (w + s), -p * (h + s))
                 end
+                p = p + 1
             end
         end
         block = block + 1
@@ -1400,6 +1460,7 @@ end
 
 -- In combat this waits (once) for the fight to end
 function TM:Layout()
+    self:UpdatePreview()   -- not protected: follows the sliders even in combat
     self:RunOutOfCombat("layout", function()
         self:LayoutGroup(self.partyButtons, self.partyFrame)
         self:LayoutRaid()
@@ -1422,8 +1483,80 @@ function TM:Layout()
     end)
 end
 
+---------------------------------------------------------------------------
+-- Layout preview (Layout tab): sample party bars drawn where the real ones go,
+-- so size and spacing can be set while solo. Plain frames, not secure, so it
+-- works in combat too. It goes away when the options close.
+---------------------------------------------------------------------------
+local PREVIEW_UNITS = {
+    { name = "You", threat = 3, me = true },
+    { name = "Party 1", threat = 0 },
+    { name = "Party 2", threat = 1 },
+    { name = "Party 3", threat = 2 },
+    { name = "Party 4", threat = 0 },
+}
+
+function TM:SetPreview(on)
+    self.previewOn = on and true or false
+    self:UpdatePreview()
+end
+
+function TM:UpdatePreview()
+    if not self.partyFrame then return end
+    self.previewBars = self.previewBars or {}
+    if not self.previewOn then
+        for _, f in ipairs(self.previewBars) do f:Hide() end
+        return
+    end
+    local db = self.db
+    local w, h, s = db.width, db.height, db.spacing
+    local font, _, flags = GameFontNormalSmall:GetFont()
+    local colors = self.THREAT_PALETTES[db.threatColors] or self.THREAT_PALETTES.standard
+    local idx = 0
+    for i, u in ipairs(PREVIEW_UNITS) do
+        local f = self.previewBars[i]
+        if not f then
+            f = CreateFrame("Frame", nil, UIParent)
+            f:SetFrameStrata("HIGH")
+            f.bg = f:CreateTexture(nil, "BACKGROUND")
+            f.bg:SetAllPoints()
+            f.bg:SetColorTexture(0, 0, 0, 0.7)
+            f.bar = f:CreateTexture(nil, "ARTWORK")
+            f.bar:SetPoint("TOPLEFT", 1, -1)
+            f.bar:SetPoint("BOTTOMRIGHT", -1, 1)
+            f.name = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            f.name:SetPoint("LEFT", 4, 0)
+            f.status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            f.status:SetPoint("RIGHT", -4, 0)
+            self.previewBars[i] = f
+        end
+        if u.me and not db.showPlayer then
+            f:Hide()
+        else
+            -- Same place as the real bar: offsets are in the preview's own scale, like the bars'
+            local col, row = self:PartySlot(idx)
+            idx = idx + 1
+            f:SetScale(db.scale)
+            f:SetSize(w, h)
+            f:ClearAllPoints()
+            f:SetPoint("TOPLEFT", self.partyFrame, "TOPLEFT", col * (w + s), -row * (h + s))
+            local c = colors[u.threat]
+            f.bar:SetTexture(self:TexturePath())
+            f.bar:SetVertexColor(c[1], c[2], c[3])
+            f.name:SetFont(font, db.nameFontSize, flags)
+            f.status:SetFont(font, db.nameFontSize, flags)
+            f.name:SetText(u.name)
+            f.status:SetText(db.healthText and "100%" or (AGGRO_WORDS[u.threat] or ""))
+            f:Show()
+        end
+    end
+end
+
 -- Warrior Defensive Stance = stance 2, Druid Bear Form = form 1
 local TANK_COND = { WARRIOR = "stance:2", DRUID = "form:1" }
+
+-- Whether "Only in tank stance or form" means anything for your class
+function TM:HasTankStance() return TANK_COND[self:PlayerClass()] ~= nil end
 
 function TM:ApplyVisibility()
     self:RunOutOfCombat("visibility", function()
@@ -1446,16 +1579,24 @@ function TM:ApplyVisibility()
             end
         end
         RegisterStateDriver(self.main, "visibility", mainCond)
-        RegisterStateDriver(self.partyFrame, "visibility", "[group:raid] hide; show")
+        -- Raid bars off: your own party's bars stay (party1-4 are your raid group)
+        RegisterStateDriver(self.partyFrame, "visibility", db.showInRaid and "[group:raid] hide; show" or "show")
         RegisterStateDriver(self.raidFrame, "visibility", db.showInRaid and "[group:raid] show; hide" or "hide")
     end)
 end
 
 -- The header looks the same locked or unlocked, and stays visible when locked
 -- so its right-click menu is always reachable.
-function TM:SetLocked(locked)
+-- quiet: from the options switch, which already shows the state
+function TM:SetLocked(locked, quiet)
     self.db.locked = locked
-    Print(locked and "locked." or "unlocked — drag the header to move.")
+    if not quiet then Print(locked and "locked." or "unlocked — drag the header to move.") end
+    self:RefreshOptions()
+end
+
+-- Repaints the options window if it's open (a setting changed from a command or menu)
+function TM:RefreshOptions()
+    if self.optionsRefresh then self.optionsRefresh() end
 end
 
 function TM:ShowHeaderMenu(owner)
@@ -1504,7 +1645,7 @@ function TM:ApplyFonts()
     -- Taunt cooldown icons (not protected, so this is safe in combat)
     if self.cdIcons then
         for _, b in ipairs(self.cdIcons) do b:SetSize(self.db.cdIconSize, self.db.cdIconSize) end
-    end
+    end    self:UpdatePreview()
 end
 
 function TM:ApplySettings()
@@ -1514,8 +1655,11 @@ function TM:ApplySettings()
     self:ApplyVisibility()
     self:ApplyBindings()
     self:UpdateMinimapButton()
-    if InCombatLockdown() then
-        Print("Changes will apply when you leave combat.")
+    self:UpdatePreview()
+    -- Said once per fight, not for every switch flipped during it
+    if InCombatLockdown() and not self.combatNoticeShown then
+        self.combatNoticeShown = true
+        Print("Changes to the bars' size, position and clicks will apply when you leave combat.")
     end
 end
 
@@ -1697,14 +1841,16 @@ end
 ---------------------------------------------------------------------------
 -- Commands
 ---------------------------------------------------------------------------
-function TM:SetShown(show)
+-- quiet: from the options switch, which already shows the state
+function TM:SetShown(show, quiet)
     self.db.shown = show
     self:ApplyVisibility()
     if InCombatLockdown() then
-        Print("Will " .. (show and "show" or "hide") .. " when you leave combat.")
-    else
+        Print("Will " .. (show and "show" or "hide") .. " the bars when you leave combat.")
+    elseif not quiet then
         Print(show and "shown." or "hidden.")
     end
+    self:RefreshOptions()
 end
 
 function TM:Toggle()
@@ -1757,15 +1903,23 @@ function TM:PrintLoadMessage()
     print(msg)
 end
 
+-- Every command, for /tm help and the options' General tab
+TM.COMMANDS = {
+    { "/tm", "open or close the options" },
+    { "/tm show", "show the bars" },
+    { "/tm hide", "hide the bars" },
+    { "/tm toggle", "show or hide the bars" },
+    { "/tm lock", "lock the bars in place" },
+    { "/tm unlock", "unlock the bars to drag them" },
+    { "/tm spells", "open the Click Bindings tab" },
+    { "/tm check", "check your bound spells" },
+    { "/tm news", "show what's new" },
+    { "/tm reset", "move the bars back to the default position" },
+}
+
 local function Help()
     Print("commands:")
-    Print("/tm — open options")
-    Print("/tm show | hide | toggle — show or hide the bars")
-    Print("/tm lock | unlock — lock or unlock the bars' position")
-    Print("/tm spells — jump to Click Bindings in the options")
-    Print("/tm check — verify your bound spells exist in Forever")
-    Print("/tm news — show the welcome / what's new window")
-    Print("/tm reset — move the bars back to the default position")
+    for _, c in ipairs(TM.COMMANDS) do Print(c[1] .. " — " .. c[2]) end
 end
 
 SLASH_TAUNTMASTERFOREVER1 = "/tm"
@@ -1820,6 +1974,7 @@ SlashCmdList.TAUNTMASTERFOREVER = function(msg)
         TM.db.point = { "CENTER", "CENTER", -300, 0 }
         TM:RunOutOfCombat("position", function() TM:RestorePosition() end)
         Print(InCombatLockdown() and "position will reset when combat ends." or "position reset.")
+        TM:UpdatePreview()
     else
         Help()
     end
@@ -1868,6 +2023,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
         TM:PrintLoadMessage()
         TM:MaybeShowSplash()
     elseif event == "PLAYER_REGEN_ENABLED" then
+        TM.combatNoticeShown = nil
         TM:FlushPending()
     -- Nameplates are tracked from the start, so the ones already up after a
     -- /reload in combat (when the bars are built late) get their marks too

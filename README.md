@@ -52,16 +52,16 @@ Taunts cast on "their target" go to the enemy the clicked player is fighting. Bl
 
 ### Options window
 
-Settings are grouped into tabs down the left side of the options window:
+Settings are grouped into tabs down the left side of the options window. Hover over any setting for a short explanation:
 
 | Tab | What's there |
 |---|---|
-| **Taunts** | Left and Right Click spell pickers, taunt announcements, target's target bar, backup taunt |
-| **Click Bindings** | Every mouse button and modifier, with spell names or macros |
-| **Layout** | Bar size, columns, spacing, scale, lock, include yourself, show in raids, hide when solo, tank-stance-only mode, sort by role, reset position |
-| **Appearance** | Class colors, role icons, health % (optionally with the aggro word), bar texture, aggro colors (standard or colorblind-friendly), text sizes |
-| **Alerts** | Aggro flash, lost-aggro warning and sound (sound choice with a Test button, when it plays, sound channel), reach fading, low mana warning, taunt cooldown icons, nameplate marks |
-| **General** | Keybinding hints, minimap icon, welcome screen, separate settings for this character, command list |
+| **Taunts** | Left and Right Click spell pickers (each says what its click does), taunt announcements with a Test button, target's target bar, backup taunt |
+| **Click Bindings** | Every mouse button and modifier, with spell names or macros, autocomplete and a spell check as you type. Changes are saved as you make them |
+| **Layout** | Bar width and height, bars per column, raid groups shown, spacing, scale, a preview of the bars while solo; show the bars, lock, include yourself, show raid bars, hide when solo, tank-stance-only mode, sort by role, reset position |
+| **Appearance** | Class colors, role icons, health % (optionally with the aggro word), fading out of reach, the red X, bar texture, aggro colors (standard or colorblind-friendly), text sizes, taunt cooldown icons |
+| **Alerts** | Aggro flash, lost aggro warning, aggro sound (sound choice with a Test button, when it plays, sound channel), low mana warning, nameplate marks |
+| **General** | Keybinding hints, minimap button, welcome screen, settings for this character only, command list |
 
 In a custom macro, `{unit}` is replaced with the clicked player (for example `/cast [@{unit}target] Growl`).
 
@@ -99,14 +99,14 @@ WoW: Forever limits what addons can do in combat. TauntMaster Forever is built a
 - **It never acts on its own.** Every taunt is your click.
 - **A click taunts whatever that player has targeted.** Healers usually target a friend, so their bar shows a **red X** and there's nothing to taunt. Use the nameplate mark on the mob, the backup taunt, or your AoE taunt.
 - **Layout changes wait until combat ends.** Colors, text and alerts always update live.
-- **Say and Yell announcements** only work inside instances.
+- **Say and Yell announcements** only work inside instances. **Raid Warning** needs leader or assist; without it, announcements go to raid chat.
 - **Tank-stance-only mode** does nothing for Paladins, who have no tank stance.
 
 ## Troubleshooting
 
 - **A click on a healer does nothing** — they probably have a friend targeted, not the mob. See **Good to know** above.
 - **A click does nothing** — type `/tm check`. It lists each bound spell and whether it was found and learned. Fix any misspelled spell on the **Click Bindings** tab.
-- **The bars disappeared** — type `/tm show`. If they're still hidden, turn off **Hide when solo** or tank-stance-only mode on the **Layout** tab.
+- **The bars disappeared** — type `/tm show`, or turn on **Show the bars** on the **Layout** tab. If they're still hidden, turn off **Hide when solo** or tank-stance-only mode there.
 - **The bars are off-screen** — type `/tm reset`.
 - **No nameplate marks** — turn on enemy nameplates (V key), and check that **Nameplate marks** is on in the **Alerts** tab.
 

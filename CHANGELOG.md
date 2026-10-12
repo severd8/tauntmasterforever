@@ -1,3 +1,21 @@
+## 1.14.7
+
+A full review of the options window: clearer, more consistent, and every setting explains itself.
+
+- **Hover help everywhere.** Point at any switch, slider or menu in the options for a short explanation.
+- **Click Bindings save as you go**, like every other setting. There's no Save button any more, and closing the window never loses a change. "Class defaults" asks for a second click.
+- **Show the bars** is now a switch on the Layout tab, so hidden bars can be brought back without typing `/tm show`.
+- **Preview bars** (Layout tab): sample party bars where yours go, so you can set their size and spacing while solo.
+- Party bars are never cut off any more by the column setting, now called **Raid groups shown**. With **Show raid bars** off, your own party's bars stay in a raid. **Include yourself** now applies in raids too.
+- The red X has its own switch, separate from fading bars your taunt can't reach.
+- Taunt cooldown icons: one choice (While on cooldown, When ready or Never) instead of two switches. Your setting is kept.
+- Settings that don't apply right now are greyed out, like the aggro word without health %, or tank-stance-only for Paladins.
+- **Announcements**: a Test button shows your message in your own chat. An empty message goes back to the default. Raid Warning without leader or assist goes to raid chat instead of failing.
+- Reorganized: fading, the red X and cooldown icons moved to Appearance; Alerts holds aggro, low mana and nameplates. Size and Text size have a Reset button. Scale shows as a percentage.
+- Clearer names: Bar width and height, Bars per column, Lock bars, Bar text, minimap button. The command list shows every command.
+- In a fight, the "will apply when you leave combat" line shows once instead of for every change. The open options window updates when you use `/tm lock` or `/tm hide`.
+- Damaged or old saved choices go back to their defaults instead of showing odd values.
+
 ## 1.14.6
 
 - In the options, clicking a switch's name now flips the switch, like clicking the switch itself.

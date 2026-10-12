@@ -6,6 +6,11 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.14.7", date = "2026-10-12", items = {
+        "Options review: hover help on every setting, and Click Bindings save as you go.",
+        "Show the bars switch and a bar preview on the Layout tab. Party bars are never cut off.",
+        "The red X has its own switch. Cooldown icons are one choice. Announcements have a Test button.",
+    } },
     { version = "1.14.6", date = "2026-10-12", items = {
         "Click a switch's name in the options to flip it. Setting names are easier to read.",
     } },

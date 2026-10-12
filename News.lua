@@ -6,6 +6,9 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.14.6", date = "2026-10-12", items = {
+        "Click a switch's name in the options to flip it. Setting names are easier to read.",
+    } },
     { version = "1.14.5", date = "2026-10-08", items = {
         "Lost aggro warning: the header flashes when a mob you were tanking turns away.",
         "Mouseover keybindings: point at a player and press to taunt what's on them. Works in raids.",

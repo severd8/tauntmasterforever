@@ -1,3 +1,8 @@
+## 1.14.6
+
+- In the options, clicking a switch's name now flips the switch, like clicking the switch itself.
+- Setting names in the options are a little brighter and easier to read, the same as in the other Forever addons.
+
 ## 1.14.5
 
 - New: **lost aggro warning**. When a mob you were tanking (your target) turns to someone else, the header above the bars flashes red and says "Lost aggro!" for a few seconds, with your aggro sound if that's on. On by default; turn it off in the Alerts tab.

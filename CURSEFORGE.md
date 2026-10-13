@@ -125,6 +125,7 @@ TauntMaster Forever is free. If it has saved your group a wipe, you can [leave a
 - **ToppedOff Forever**: reminds you when buffs, food, reagents, ammo or gear need topping off. Free on CurseForge.
 - **Outfitter Forever**: the classic Outfitter gear manager, ported to WoW Forever. Free on CurseForge.
 - **BattleText Forever**: scrolling combat text for your hits, heals and the damage you take. Free on CurseForge.
+- **[AuctionHouse Forever](https://www.curseforge.com/wow/addons/auctionhouse-forever)**: an auction house addon for WoW Forever. Free on CurseForge.
 
 ## Credits
 

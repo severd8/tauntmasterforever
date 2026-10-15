@@ -401,6 +401,7 @@ local function SaveRow(row)
     bindings[row.key] = new
     TM:ApplyBindings()
     for _, fn in ipairs(selectorRefreshers) do fn() end
+    RunStates()
 end
 
 local function SaveAllRows()
@@ -684,11 +685,26 @@ local function SpellSelector(card, key, title)
     return b
 end
 
-local function BuildTauntsTab(p)
-    SpellSelector(Card(p, "Left click", 0, 0, HALF_W, 96), "1", "Left click")
-    SpellSelector(Card(p, "Right click", HALF_W + GAP, 0, HALF_W, 96), "2", "Right click")
+-- Whether the Right Click spell can back up the Left Click one: both cast on
+-- the player's target, and they're different spells
+local function CanBackUp()
+    local b = TM:GetBindings()
+    local l, r = b["1"], b["2"]
+    return l and r and l.kind == "enemy" and r.kind == "enemy" and l.text ~= "" and r.text ~= ""
+        and l.text:lower() ~= r.text:lower() or false
+end
 
-    local ann = Card(p, "Announcements", 0, -106, PAGE_W, 130)
+local function BuildTauntsTab(p)
+    SpellSelector(Card(p, "Left click", 0, 0, HALF_W, 118), "1", "Left click")
+    local right = Card(p, "Right click", HALF_W + GAP, 0, HALF_W, 118)
+    SpellSelector(right, "2", "Right click")
+    local backup = Switch(right, "Backup when Left is on cooldown", 12, -90, "backupOnCooldown",
+        { onChange = function() TM:ApplyBindings(); TM:UpdateCooldowns() end,
+          tip = "When the Left Click taunt can't be cast (on cooldown, or out of its range), a Left Click "
+            .. "casts this spell instead. Both clicks must be a spell on their target, like Taunt and Mocking Blow." })
+    AddState(function() backup:SetDisabled(not CanBackUp()) end)
+
+    local ann = Card(p, "Announcements", 0, -128, PAGE_W, 124)
     RowLabel(ann, "Channel", 12, -30)
     Choice(ann, 120, -28, 170, TM.ANNOUNCE_CHANNELS, TM.ANNOUNCE_LABELS, "announceChannel",
         { tipTitle = "Channel", tip = "Where to say it when your taunt lands. Off sends nothing." })
@@ -725,7 +741,7 @@ local function BuildTauntsTab(p)
     MutedNote(ann, "Sent only when a taunt you clicked on a bar lands. Say and Yell only work inside "
         .. "instances. Raid Warning needs leader or assist; otherwise it goes to Raid.", 120, -84, PAGE_W - 132)
 
-    local more = Card(p, "More ways to taunt", 0, -246, PAGE_W, 130)
+    local more = Card(p, "More ways to taunt", 0, -262, PAGE_W, 130)
     Switch(more, "Show your target's target bar", 12, -30, "showToT",
         { tip = "A bar for whoever your target is attacking, above the cooldown icons." })
     MutedNote(more, "Shows who your target is hitting. Click it to taunt your own target.", NOTE_X, -52)
@@ -773,6 +789,9 @@ local function BuildLayoutTab(p)
     AddState(function() tank:SetDisabled(not TM:HasTankStance()) end)
     Switch(vis, "Sort by role", COL2, -30 - 2 * ROW, "sortByRole",
         { tip = "Tanks first, then healers, then damage, when the game has given out roles." })
+    Switch(vis, "Pet bars", COL2, -30 - 3 * ROW, "showPets",
+        { tip = "Bars for your pet and your party's pets, in a column after the party bars. Click one to taunt "
+            .. "what the pet is fighting. Pets often hold mobs on purpose, so their bars don't flash." })
     local reset = FlatButton(vis, "Reset position", 130)
     reset:SetPoint("TOPLEFT", 12, -142)
     reset:SetScript("OnClick", function() SlashCmdList.TAUNTMASTERFOREVER("reset") end)
@@ -816,6 +835,10 @@ local function BuildAppearanceTab(p)
     Choice(bars, COL2 + 100, -60, 142, TM.THREAT_PALETTE_KEYS, TM.THREAT_PALETTE_LABELS, "threatColors",
         { onChange = function() TM:RefreshAll(); TM:UpdatePreview() end, menuLabels = PALETTE_MENU,
           tipTitle = "Aggro colors", tip = "Standard: yellow, orange, red. Colorblind-friendly: sky blue, orange, purple." })
+    Switch(bars, "Mob count", COL2, -96, "mobCount",
+        { onChange = function() TM:UpdateMobCounts() end,
+          tip = "\"x3\" on a player's bar when three enemies are attacking them. Counts enemies whose nameplates "
+            .. "are on screen (V key). Inside dungeons the game often hides who a mob is attacking." })
 
     local text = Card(p, "Text size", 0, -196, PAGE_W, 80)
     FlatSlider(text, "Header", 12, -30, HALF_W - 20, "headerFontSize",
@@ -824,39 +847,48 @@ local function BuildAppearanceTab(p)
         { onChange = function() TM:ApplyFonts() end, tip = "Names, aggro words, health %, low mana and keybinding hints." })
     ResetButton(text, { "headerFontSize", "nameFontSize" }, function() TM:ApplyFonts() end)
 
-    local cd = Card(p, "Taunt cooldown icons", 0, -286, PAGE_W, 84)
-    RowLabel(cd, "Show", 12, -30)
+    local cd = Card(p, "Taunt cooldowns", 0, -286, PAGE_W, 92)
+    RowLabel(cd, "Icons", 12, -30)
     Choice(cd, 120, -28, 150, TM.CD_MODE_KEYS, TM.CD_MODE_LABELS, "cdMode",
         { onChange = function() TM:UpdateCooldowns() end, tipTitle = "Taunt cooldown icons",
           tip = "Icons for your Left and Right Click spells, above the header." })
     FlatSlider(cd, "Icon size", COL2, -30, HALF_W - 20, "cdIconSize")
+    Switch(cd, "Dim the bars while it's on cooldown", 12, -62, "cdOnBars",
+        { onChange = function() TM:UpdateCooldowns() end,
+          tip = "While your Left Click taunt is on cooldown, the bars darken and say CD, so you know a click "
+            .. "won't land. With the Right Click backup on, only when both are on cooldown." })
 end
 
 local function BuildAlertsTab(p)
-    local aggro = Card(p, "Aggro", 0, 0, PAGE_W, 196)
+    local aggro = Card(p, "Aggro", 0, 0, PAGE_W, 222)
     Switch(aggro, "Flash a player's bar when they pull aggro", 12, -30, "flashAggro",
         { tip = "For anyone but you and other tanks, from orange (being attacked)." })
     Switch(aggro, "Warn when you lose aggro on your target", 12, -30 - ROW, "lostAggro",
         { onChange = function() TM:CheckLostAggro() end,
-          tip = "The header flashes \"Lost aggro!\" when a mob you were tanking turns to someone else." })
-    Switch(aggro, "Play a sound", 12, -30 - 2 * ROW, "aggroSound",
+          tip = "When a mob you were tanking turns to someone else, the header flashes and names who has it "
+            .. "now, like \"Lost aggro: Aeri\", and their bar gets a gold outline." })
+    Switch(aggro, "Warn when you're out of tank stance, form or seal", 12, -30 - 2 * ROW, "stanceWarn",
+        { onChange = function() TM:UpdateHeader() end,
+          tip = "In a group, the header says \"No Defensive Stance\", \"No Bear Form\" or \"No Seal of Fury\" "
+            .. "(Judgement only taunts with it) until you fix it." })
+    Switch(aggro, "Play a sound", 12, -30 - 3 * ROW, "aggroSound",
         { tip = "When a player pulls aggro (see below), and with the lost aggro warning." })
-    RowLabel(aggro, "Sound", 12, -112)
-    Choice(aggro, 150, -110, 150, TM.AGGRO_SOUND_KEYS, TM.AGGRO_SOUND_LABELS, "aggroSoundKey",
+    RowLabel(aggro, "Sound", 12, -138)
+    Choice(aggro, 150, -136, 150, TM.AGGRO_SOUND_KEYS, TM.AGGRO_SOUND_LABELS, "aggroSoundKey",
         { onChange = function() TM:TestAggroSound() end, tipTitle = "Sound", tip = "Picking one plays it." })
     local test = FlatButton(aggro, "Test", 60)
-    test:SetPoint("TOPLEFT", 306, -110)
+    test:SetPoint("TOPLEFT", 306, -136)
     test:SetScript("OnClick", function() TM:TestAggroSound() end)
     Tip(test, "Test", "Plays the sound.")
-    RowLabel(aggro, "Play it when", 12, -140)
-    Choice(aggro, 150, -138, 216, TM.AGGRO_LEVEL_KEYS, TM.AGGRO_LEVEL_LABELS, "aggroSoundLevel",
+    RowLabel(aggro, "Play it when", 12, -166)
+    Choice(aggro, 150, -164, 216, TM.AGGRO_LEVEL_KEYS, TM.AGGRO_LEVEL_LABELS, "aggroSoundLevel",
         { tipTitle = "Play it when", tip = "How much aggro a player needs before the sound plays. The flash always starts at orange." })
-    RowLabel(aggro, "Sound channel", 12, -168)
-    Choice(aggro, 150, -166, 150, TM.SOUND_CHANNEL_KEYS, TM.SOUND_CHANNEL_LABELS, "aggroSoundChannel",
+    RowLabel(aggro, "Sound channel", 12, -194)
+    Choice(aggro, 150, -192, 150, TM.SOUND_CHANNEL_KEYS, TM.SOUND_CHANNEL_LABELS, "aggroSoundChannel",
         { onChange = function() TM:TestAggroSound() end, tipTitle = "Sound channel",
           tip = "Which of the game's volume sliders the sound follows." })
 
-    local mana = Card(p, "Low mana", 0, -206, PAGE_W, 80)
+    local mana = Card(p, "Low mana", 0, -232, PAGE_W, 72)
     Switch(mana, "Show a low mana warning", 12, -30, "hideManaWarning",
         { invert = true, onChange = function() TM:UpdateManaWarning() end,
           tip = "Shown beside the bar of a player who's low on mana." })
@@ -865,7 +897,7 @@ local function BuildAlertsTab(p)
         { suffix = "%", onChange = function() TM:UpdateManaWarning() end })
     AddState(function() warnAt:SetDisabled(TM.db.hideManaWarning) end)
 
-    local plates = Card(p, "Nameplates", 0, -296, PAGE_W, 80)
+    local plates = Card(p, "Nameplates", 0, -314, PAGE_W, 72)
     Switch(plates, "Mark mobs attacking your healers and damage dealers", 12, -30, "nameplateMarks",
         { onChange = function() TM:UpdatePlateMarks() end,
           tip = "The logo over an enemy that's attacking anyone in your group but you and other tanks." })
@@ -894,13 +926,81 @@ local function BuildGeneralTab(p)
     MutedNote(other, "Starts as a copy of your shared settings. Click bindings are kept for each class either way.",
         NOTE_X, -104, PAGE_W - NOTE_X - 12)
 
-    local cmds = Card(p, "Commands", 0, -246, PAGE_W, 118)
+    local cmds = Card(p, "Commands", 0, -246, PAGE_W, 134)
     local half = math.ceil(#TM.COMMANDS / 2)
     for i, c in ipairs(TM.COMMANDS) do
         local col, row = (i <= half) and 0 or 1, (i - 1) % half
         local fs = Text(cmds, "|cff8fd3ff" .. c[1] .. "|r  " .. c[2], "GameFontHighlightSmall")
         fs:SetPoint("TOPLEFT", 12 + col * (COL2 - 12), -28 - row * 17)
     end
+end
+
+-- Share: your settings as one line of text, and back
+local function BuildShareTab(p)
+    local out = Card(p, "Copy your settings", 0, 0, PAGE_W, 116)
+    MutedNote(out, "Your settings and click bindings (for every class) as one line of text. Click Select, "
+        .. "press Ctrl+C, then paste it on another character or send it to a friend.", 12, -28, PAGE_W - 24)
+    local outBox = FlatEditBox(out, PAGE_W - 24 - 98)
+    outBox:SetPoint("TOPLEFT", 12, -68)
+    outBox:SetMaxLetters(0)
+    Tip(outBox, "Settings text", "Press Ctrl+C to copy it once it's selected.")
+    local copy = FlatButton(out, "Select", 90)
+    copy:SetPoint("LEFT", outBox, "RIGHT", 8, 0)
+    copy:SetScript("OnClick", function()
+        outBox:SetText(TM:ExportSettings())
+        outBox:SetFocus()
+        outBox:HighlightText()
+    end)
+    Tip(copy, "Select", "Selects the text, ready for Ctrl+C.")
+    outBox:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+    -- The box always shows your current settings: typing in it changes nothing
+    outBox:SetScript("OnTextChanged", function(self, userInput)
+        if userInput then self:SetText(TM:ExportSettings()); self:HighlightText() end
+    end)
+    AddRefresher(function() outBox:SetText(TM:ExportSettings()) end)
+
+    local inCard = Card(p, "Use shared settings", 0, -126, PAGE_W, 136)
+    MutedNote(inCard, "Paste the text (Ctrl+V), then click Use twice. It replaces your settings and the click "
+        .. "bindings it has. Where the bars sit stays as it is.", 12, -28, PAGE_W - 24)
+    local inBox = FlatEditBox(inCard, PAGE_W - 24 - 98)
+    inBox:SetPoint("TOPLEFT", 12, -68)
+    inBox:SetMaxLetters(0)
+    Tip(inBox, "Shared settings", "Paste settings text from TauntMaster Forever here.")
+    local msg = MutedNote(inCard, "", 12, -100, PAGE_W - 24)
+    local use = FlatButton(inCard, "Use", 90)
+    use:SetPoint("LEFT", inBox, "RIGHT", 8, 0)
+    -- Asks for a second click, like Class defaults
+    use:SetScript("OnClick", function(self)
+        local text = inBox:GetText() or ""
+        if text:match("^%s*$") then
+            msg:SetText("|cffffcc00Paste settings text in the box first.|r")
+            return
+        end
+        if not self.armed then
+            local token = {}
+            self.armed = token
+            self:SetText("Click again")
+            msg:SetText("This replaces your settings. Click again to use them.")
+            C_Timer.After(4, function()
+                if self.armed == token then self.armed = nil; self:SetText("Use") end
+            end)
+            return
+        end
+        self.armed = nil
+        self:SetText("Use")
+        local ok, err = TM:ImportSettings(text)
+        if ok then
+            inBox:SetText("")
+            RunRefreshers()
+            msg:SetText("|cff40ff40Settings applied.|r")
+            TM.Print("shared settings applied.")
+        else
+            msg:SetText("|cffff4040" .. err .. "|r")
+        end
+    end)
+    Tip(use, "Use", "Replaces your settings with the pasted ones. Click twice to confirm.")
+    AddRefresher(function() msg:SetText("") end)
+    TM._share = { outBox = outBox, copy = copy, inBox = inBox, use = use, msg = msg }
 end
 
 local TABS = {
@@ -910,6 +1010,7 @@ local TABS = {
     { key = "appearance", label = "Appearance",     icon = "Interface\\Icons\\INV_Fabric_Silk_02",         build = BuildAppearanceTab },
     { key = "alerts",     label = "Alerts",         icon = "Interface\\Icons\\Ability_Warrior_BattleShout", build = BuildAlertsTab },
     { key = "general",    label = "General",        icon = "Interface\\Icons\\INV_Misc_Gear_01",           build = BuildGeneralTab },
+    { key = "share",      label = "Share",          icon = "Interface\\Icons\\INV_Scroll_03",              build = BuildShareTab },
 }
 
 local pages, tabButtons = {}, {}   -- filled when the window is built

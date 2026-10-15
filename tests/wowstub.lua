@@ -161,6 +161,18 @@ function UnitIsUnit(a, b)
     end
     return a == b
 end
+-- GUIDs: "GUID-party2". A nameplate's target is whoever MOB_TARGET says; hidden
+-- (secret) with SECRET_UNITISUNIT, like UnitIsUnit
+function UnitGUID(u)
+    local mob = type(u) == "string" and u:match("^(nameplate%d+)target$")
+    if mob then
+        local t = MOB_TARGET[mob]
+        if not t then return nil end
+        if SECRET_UNITISUNIT then return secret("GUID-" .. t) end
+        return "GUID-" .. t
+    end
+    return "GUID-" .. tostring(u)
+end
 PLATES = {}
 C_NamePlate = { GetNamePlateForUnit = function(u)
     PLATES[u] = PLATES[u] or newObj("Frame", nil, UIParent)
@@ -237,6 +249,7 @@ C_Spell = {
     -- isActive / isOnGCD stay readable, like the real game.
     GetSpellCooldown = function(id)
         local active = CD_ACTIVE ~= false
+        if CD_BY_ID and CD_BY_ID[id] ~= nil then active = CD_BY_ID[id] end
         return { startTime = maybeSecret(active and 100 or 0), duration = maybeSecret(active and 10 or 0),
             isActive = active, isOnGCD = CD_GCD == true }
     end,

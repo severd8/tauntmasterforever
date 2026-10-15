@@ -6,6 +6,11 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.15.0", date = "2026-10-15", items = {
+        "Bars dim and say CD while your taunt is on cooldown. Optional: Right Click as the backup.",
+        "Lost aggro names who has the mob and outlines their bar. Stance, form and seal reminder.",
+        "Optional pet bars, a mob count on each bar, and /tm share to copy your settings.",
+    } },
     { version = "1.14.7", date = "2026-10-12", items = {
         "Options review: hover help on every setting, and Click Bindings save as you go.",
         "Show the bars switch and a bar preview on the Layout tab. Party bars are never cut off.",

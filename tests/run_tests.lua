@@ -1014,15 +1014,40 @@ local logBefore = #LOG
 targetThreat = 3; tick()
 targetThreat = 3; tick()
 assertEq(h.text:GetText(), "TauntMaster", "no warning while you hold it")
+-- The mob is now on party1: the header names them and their bar gets the gold outline
+local realUnitIsUnit = UnitIsUnit
+UnitIsUnit = function(a, b) if b == "targettarget" then return a == "party1" end return realUnitIsUnit(a, b) end
+UnitName = (function(real) return function(u) if u == "targettarget" then return "Aeri" end return real(u) end end)(UnitName)
+STATE.inGroup, STATE.party = true, 2
+STATE.unitsExist = { player = true, party1 = true, party2 = true }
 targetThreat = 1; tick()
-assertEq(h.text:GetText(), "Lost aggro!", "header warns when the mob turns away")
+assertEq(h.text:GetText(), "Lost aggro: Aeri", "header warns when the mob turns away, and says who has it")
 assertEq(h.alertAnim.__playing, true, "header pulses")
+local p1 = TM.unitToButton.party1
+assertEq(p1.lostGlowInner.__alpha, 1, "their bar is outlined")
+assertEq(p1.lostGlowAnim.__playing, true, "and pulses")
+assertEq(TM.unitToButton.party2.lostGlowInner.__alpha, 0, "nobody else's")
 local played = false
 for i = logBefore + 1, #LOG do if LOG[i]:find("^SOUND") then played = true end end
 assert(played, "aggro sound plays with the warning")
 for _, fn in ipairs(later) do fn() end; later = {}
 assertEq(h.text:GetText(), "TauntMaster", "back to the name after a few seconds")
 assertEq(h.alertAnim.__playing, false, "pulse stops")
+assertEq(p1.lostGlowAnim.__playing, false, "outline stops")
+assertEq(p1.lostGlow.__alpha, 0, "and is gone")
+-- Names the game hides are written in by the game; no name at all: the plain warning
+local realName = UnitName
+SECRET_MODE = true; local hiddenName = UnitName("party1"); SECRET_MODE = false
+UnitName = function(u) if u == "targettarget" then return hiddenName end return realName(u) end
+UnitIsUnit = function(a, b) if b == "targettarget" then return UnitExists("x") end return realUnitIsUnit(a, b) end
+targetThreat = 3; tick(); targetThreat = 1; tick()
+assertEq(h.text.__fmt, "Lost aggro: %s", "hidden name formatted by the game")
+for _, fn in ipairs(later) do fn() end; later = {}
+UnitName = function(u) if u == "targettarget" then return nil end return realName(u) end
+targetThreat = 3; tick(); targetThreat = 1; tick()
+assertEq(h.text:GetText(), "Lost aggro!", "no one targeted: plain warning")
+for _, fn in ipairs(later) do fn() end; later = {}
+UnitName = realName; UnitIsUnit = realUnitIsUnit
 -- Switching targets, hidden threat and an orange (still tanking) mob don't warn
 targetThreat = 3; tick(); targetThreat = 0; fire("PLAYER_TARGET_CHANGED"); tick()
 assertEq(h.text:GetText(), "TauntMaster", "a new target is not a loss")
@@ -1374,6 +1399,262 @@ assertEq(TM.db.cdMode, "never", "both off becomes Never")
 TauntMasterForeverDB = keep
 fire("ADDON_LOADED", ADDON)
 TM:ApplySettings()
+
+step("backup taunt when the Left Click taunt is on cooldown")
+STATE.class = "WARRIOR"; TM.db.bindings.WARRIOR = nil; TM.db.tauntFallback = false
+STATE.inGroup, STATE.party = true, 2
+STATE.unitsExist = { player = true, party1 = true, party2 = true }
+fire("GROUP_ROSTER_UPDATE")
+assertEq(TM.db.backupOnCooldown, false, "off by default")
+TM:ApplyBindings()
+local w1 = TM.unitToButton.party1
+assertEq(w1.__attrs.macrotext1, "/cast [@party1target,harm,nodead] Taunt", "plain Left Click when off")
+TM.db.backupOnCooldown = true; TM:ApplySettings()
+local both = "/cast [@party1target,harm,nodead] Taunt\n/cast [@party1target,harm,nodead] Mocking Blow"
+assertEq(w1.__attrs.macrotext1, both, "Left Click tries Mocking Blow after Taunt")
+assertEq(w1.__attrs["*macrotext-tmleft"], both, "and so does the Left Click keybinding")
+assertEq(w1.__attrs.macrotext2, "/cast [@party1target,harm,nodead] Mocking Blow", "Right Click unchanged")
+assertEq(w1.__attrs["shift-macrotext1"], "/cast Challenging Shout", "Shift-Left unchanged")
+assertEq(TM.totButton.__attrs.macrotext1,
+    "/cast [@target,harm,nodead] Taunt\n/cast [@target,harm,nodead] Mocking Blow", "target's target bar too")
+TM.db.tauntFallback = true; TM:ApplySettings()
+assertEq(w1.__attrs.macrotext1, "/cast [@party1target,harm,nodead] Taunt; [@party1targettarget,harm,nodead] Taunt\n"
+    .. "/cast [@party1target,harm,nodead] Mocking Blow; [@party1targettarget,harm,nodead] Mocking Blow",
+    "both lines keep the no-enemy backup")
+TM.db.tauntFallback = false; TM:ApplySettings()
+-- Announced when the backup is what lands
+TM.db.announceChannel = "PARTY"; CHAT = {}; FAKE_TIME = FAKE_TIME + 3
+w1.__scripts.PreClick(w1, "LeftButton"); fire("UNIT_SPELLCAST_SUCCEEDED", "player", "g", 694)
+assertEq(CHAT[1], "PARTY:Name_party1target has been taunted off of Name_party1!", "the backup is announced")
+CHAT = {}; FAKE_TIME = FAKE_TIME + 3
+w1.__scripts.PreClick(w1, "RightButton"); fire("UNIT_SPELLCAST_SUCCEEDED", "player", "g", 355)
+assertEq(#CHAT, 0, "a Right Click doesn't count Taunt")
+TM.db.announceChannel = "none"; FAKE_TIME = FAKE_TIME + 3
+-- Only between two spells on their target: an AoE taunt isn't a backup
+TM:GetBindings()["2"] = { kind = "self", text = "Challenging Shout" }; TM:ApplyBindings()
+assertEq(w1.__attrs.macrotext1, "/cast [@party1target,harm,nodead] Taunt", "no AoE backup")
+TM:GetBindings()["2"] = { kind = "enemy", text = "Taunt" }; TM:ApplyBindings()
+assertEq(w1.__attrs.macrotext1, "/cast [@party1target,harm,nodead] Taunt", "not the same spell twice")
+TM.db.bindings.WARRIOR = nil; TM:ApplyBindings()
+-- The switch is greyed out unless both clicks qualify
+TM:OpenConfig("taunts")
+local backupSw = findSwitch("Backup when Left is on cooldown")
+assert(backupSw, "backup switch on the Taunts tab")
+closeWin(); TM:OpenConfig("taunts")
+assertEq(backupSw.disabled, false, "warriors can use it")
+closeWin(); STATE.class = "DRUID"; TM.db.bindings.DRUID = TM:DefaultBindings(); TM:OpenConfig("taunts")
+assertEq(backupSw.disabled, true, "druids' Right Click is an AoE taunt")
+closeWin()
+TM.db.backupOnCooldown = false; TM:ApplyBindings()
+
+step("bars dim while the Left Click taunt is on cooldown")
+STATE.class = "DRUID"; TM.db.bindings.DRUID = TM:DefaultBindings(); TM:ApplyBindings()
+assertEq(TM.db.cdOnBars, true, "on by default")
+local d1 = TM.unitToButton.party1
+CD_ACTIVE = true; tick()
+assertEq(d1.cdCover.__shown, true, "Growl on cooldown: bar covered")
+assertEq(d1.cdText:GetText(), "CD", "and says CD")
+CD_ACTIVE = false; tick()
+assertEq(d1.cdCover.__shown, false, "ready: no cover")
+assertEq(d1.cdText:GetText(), "", "no CD")
+CD_ACTIVE = true; CD_GCD = true; SECRET_MODE = true; tick(); SECRET_MODE = false
+assertEq(d1.cdCover.__shown, false, "the global cooldown doesn't count (hidden times)")
+CD_GCD = nil; SECRET_MODE = true; tick(); SECRET_MODE = false
+assertEq(d1.cdCover.__shown, true, "hidden times, on cooldown: covered")
+TM.db.cdOnBars = false; tick()
+assertEq(d1.cdCover.__shown, false, "can be turned off")
+TM.db.cdOnBars = true
+TM.db.cdMode = "never"; tick()
+assertEq(d1.cdCover.__shown, true, "works with the cooldown icons off")
+TM.db.cdMode = "cooldown"
+-- With the backup on, only when both are on cooldown
+STATE.class = "WARRIOR"; TM.db.backupOnCooldown = true; TM:ApplyBindings()
+KNOWN["Mocking Blow"] = { spellID = 694, iconID = 6, name = "Mocking Blow" }
+CD_BY_ID = { [355] = true, [694] = false }; tick()
+assertEq(d1.cdCover.__shown, false, "Taunt on cooldown but Mocking Blow ready: no cover")
+CD_BY_ID = { [355] = true, [694] = true }; tick()
+assertEq(d1.cdCover.__shown, true, "both on cooldown: covered")
+KNOWN["Mocking Blow"] = nil; CD_BY_ID = nil; CD_ACTIVE = nil
+STATE.class = "DRUID"; TM.db.backupOnCooldown = false; TM:ApplyBindings(); tick()
+
+step("tank stance, form and seal reminder")
+local form = 1
+GetShapeshiftForm = function() return form end
+STATE.inGroup = true
+assertEq(TM.db.stanceWarn, true, "on by default")
+tick(); assertEq(h.text:GetText(), "TauntMaster", "druid in Bear Form: no reminder")
+form = 0; tick()
+assertEq(h.text:GetText(), "No Bear Form", "druid out of Bear Form")
+form = 3; tick()
+assertEq(h.text:GetText(), "No Bear Form", "Cat Form isn't Bear Form")
+STATE.inGroup = false; tick()
+assertEq(h.text:GetText(), "TauntMaster", "solo: no reminder")
+STATE.inGroup = true; tick()
+TM.db.stanceWarn = false; tick()
+assertEq(h.text:GetText(), "TauntMaster", "can be turned off")
+TM.db.stanceWarn = true
+SECRET_MODE = true; form = UnitExists("player"); SECRET_MODE = false; tick()
+assertEq(h.text:GetText(), "TauntMaster", "hidden form: no guess")
+-- Lost aggro takes the header for a moment, then the reminder comes back
+form = 0; tick()
+later = {}; C_Timer.After = function(_, fn) later[#later + 1] = fn end
+TM:ShowLostAggro()
+assert(h.text:GetText():find("^Lost aggro"), "lost aggro shows over the reminder")
+tick()
+assert(h.text:GetText():find("^Lost aggro"), "and stays for its few seconds")
+for _, fn in ipairs(later) do fn() end; later = {}
+C_Timer.After = realAfter
+assertEq(h.text:GetText(), "No Bear Form", "then the reminder is back")
+STATE.class = "WARRIOR"; form = 1; tick()
+assertEq(h.text:GetText(), "No Defensive Stance", "warrior in Battle Stance")
+form = 2; tick()
+assertEq(h.text:GetText(), "TauntMaster", "warrior in Defensive Stance")
+local realPlayerSpell = IsPlayerSpell
+IsPlayerSpell = function(id) return id ~= 71 end
+form = 1; tick()
+assertEq(h.text:GetText(), "TauntMaster", "no reminder before Defensive Stance is learned")
+IsPlayerSpell = realPlayerSpell
+STATE.class = "PALADIN"; tick()
+assertEq(h.text:GetText(), "TauntMaster", "paladin without Seal of Fury in the spellbook: nothing")
+KNOWN["Seal of Fury"] = { spellID = 20164, iconID = 7, name = "Seal of Fury" }
+local auras = {}
+C_UnitAuras = { GetPlayerAuraBySpellID = function(id) return auras[id] end }
+tick()
+assertEq(h.text:GetText(), "No Seal of Fury", "paladin without the seal up")
+auras[20164] = { name = "Seal of Fury" }; tick()
+assertEq(h.text:GetText(), "TauntMaster", "seal up: no reminder")
+auras = {}
+C_UnitAuras = { GetPlayerAuraBySpellID = function() return nil end,
+    GetAuraDataBySpellName = function(u, n) if n == "Seal of Fury" then return { name = n } end end }
+tick()
+assertEq(h.text:GetText(), "TauntMaster", "found by name too")
+C_UnitAuras = nil; tick()
+assertEq(h.text:GetText(), "TauntMaster", "no aura API: no guess")
+KNOWN["Seal of Fury"] = nil; STATE.class = "DRUID"; GetShapeshiftForm = nil; tick()
+
+step("pet bars")
+assertEq(TM.db.showPets, false, "off by default")
+STATE.inGroup, STATE.party = true, 2
+STATE.unitsExist = { player = true, party1 = true, party2 = true, partypet2 = true }
+local pet, ppet2 = TM.unitToButton.pet, TM.unitToButton.partypet2
+fire("GROUP_ROSTER_UPDATE")
+assertEq(ppet2.__shown, false, "hidden while off")
+TM.db.showPets = true; TM:ApplySettings()
+local w, s = TM.db.width, TM.db.spacing
+assertEq(ppet2.__pos[1], w + s, "pets start a column after the party bars")
+assertEq(ppet2.__pos[2], 0, "a pet that's out takes the first pet slot")
+assertEq(pet.__pos[2] < 0, true, "a pet that isn't out waits below")
+assertEq(ppet2.__attrs.macrotext1, "/cast [@partypet2target,harm,nodead] Growl", "clicking a pet taunts what it's fighting")
+assertEq(ppet2:GetName(), nil, "pet bars have no global name")
+STATE.unitsExist.pet = true; fire("UNIT_PET", "player")
+assertEq(pet.__pos[2], 0, "your pet, once out, comes first")
+assertEq(ppet2.__pos[2], -(TM.db.height + s), "then your party's")
+-- Summoned mid-fight: the layout waits for the fight to end
+COMBAT = true; BLOCKED = {}
+STATE.unitsExist.partypet1 = true; fire("UNIT_PET", "party1")
+assertEq(#BLOCKED, 0, "nothing protected touched in combat: " .. table.concat(BLOCKED, ", "))
+COMBAT = false; fire("PLAYER_REGEN_ENABLED")
+assertEq(TM.unitToButton.partypet1.__pos[2], -(TM.db.height + s), "laid out after the fight")
+TM.db.unitsPerColumn = 3; TM:ApplySettings()
+assertEq(pet.__pos[1], 2 * (w + s), "a fresh column after the party bars' two columns")
+TM.db.unitsPerColumn = 5
+-- A pet with aggro: red bar, no flash, no sound
+STATE.threat = { partypet2 = 3 }; LOG = {}; tick()
+assertEq(ppet2.flashAnim.__playing, false, "pets don't flash")
+for _, l in ipairs(LOG) do assert(not l:find("^SOUND"), "pets don't play the aggro sound") end
+assertEq(ppet2.manaText.__shown, false, "no low mana line for pets")
+STATE.threat = {}
+TM.db.showPets = false; TM:ApplySettings()
+assertEq(ppet2.__shown, false, "hidden again")
+STATE.unitsExist = { player = true, party1 = true, party2 = true }
+
+step("mob count on bars")
+assertEq(TM.db.mobCount, true, "on by default")
+for i = 4, 6 do fire("NAME_PLATE_UNIT_ADDED", "nameplate" .. i) end
+local c2 = TM.unitToButton.party2
+MOB_TARGET = { nameplate4 = "party2", nameplate5 = "party2", nameplate6 = "party2" }; tick()
+assertEq(c2.countText.__shown, true, "three mobs on party2")
+assertEq(c2.countText:GetText(), "x3", "x3")
+assertEq(TM.unitToButton.party1.countText.__shown, false, "none on party1")
+MOB_TARGET = { nameplate4 = "party2", nameplate5 = "party1" }; tick()
+assertEq(c2.countText.__shown, false, "one mob: nothing (the aggro color says it)")
+MOB_TARGET = { nameplate4 = "party2", nameplate5 = "party2" }
+HOSTILE.nameplate5 = false; tick()
+assertEq(c2.countText.__shown, false, "friendly plates don't count")
+HOSTILE.nameplate5 = nil; tick()
+assertEq(c2.countText:GetText(), "x2", "two")
+fire("NAME_PLATE_UNIT_REMOVED", "nameplate5"); tick()
+assertEq(c2.countText.__shown, false, "plates that go away stop counting")
+fire("NAME_PLATE_UNIT_ADDED", "nameplate5")
+SECRET_UNITISUNIT = true; tick()
+assertEq(c2.countText.__shown, false, "hidden answers aren't counted")
+SECRET_UNITISUNIT = false
+TM.db.mobCount = false; tick()
+assertEq(c2.countText.__shown, false, "can be turned off")
+TM.db.mobCount = true
+for i = 4, 6 do fire("NAME_PLATE_UNIT_REMOVED", "nameplate" .. i) end
+MOB_TARGET = {}; tick()
+
+step("share settings")
+TM.db.width, TM.db.announceText, TM.db.sortByRole = 133, 'Say "hi" 100% | {target}', true
+TM.db.bindings.WARRIOR = { ["1"] = { kind = "macro", text = "/cast [@{unit}] Taunt\\n/say Mine! Über" } }
+local shared = TM:ExportSettings()
+assert(shared:find("^TMF1:"), "starts with its tag")
+assert(not shared:find("|", 1, true), "no | for the game's edit boxes to mangle")
+assert(not shared:find("\n", 1, true), "one line")
+local myPoint = TM.db.point
+TM.db.width, TM.db.announceText, TM.db.sortByRole = 120, "x", false
+TM.db.bindings.WARRIOR = nil
+TM.db.point = { "TOP", "TOP", 5, 5 }
+local ok, err = TM:ImportSettings("  " .. shared .. "  ")
+assert(ok, "import: " .. tostring(err))
+assertEq(TM.db.width, 133, "width back")
+assertEq(TM.db.announceText, 'Say "hi" 100% | {target}', "tricky text back")
+assertEq(TM.db.sortByRole, true, "switch back")
+assertEq(TM.db.bindings.WARRIOR["1"].text, "/cast [@{unit}] Taunt\\n/say Mine! Über", "bindings of another class back")
+assertEq(TM.db.point[1], "TOP", "where the bars sit isn't shared")
+TM.db.point = myPoint
+-- Bad text changes nothing
+local before = TM:ExportSettings()
+assertEq((TM:ImportSettings("hello")), false, "not settings text")
+assertEq((TM:ImportSettings(shared:sub(1, #shared - 5))), false, "cut off")
+assertEq((TM:ImportSettings("TMF1:" .. 'n1;')), false, "not a table")
+assertEq((TM:ImportSettings("TMF1:" .. string.rep("{", 50))), false, "nested too deep")
+assertEq(TM:ExportSettings(), before, "nothing changed by bad text")
+-- Wrong kinds, odd numbers and unknown bindings are cleaned up
+ok = TM:ImportSettings('TMF1:{"width""wide""height"n999;"evil"T"bindings"{"DRUID"{"1"{"kind""os.exit""text""x"}"2"{"kind""enemy""text""Growl"}"9"{"kind""enemy""text""x"}}}}')
+assert(ok, "a messy but readable text is used")
+assertEq(TM.db.width, 133, "a text where a number goes is ignored")
+assertEq(TM.db.height, TM.LIMITS.height[2], "numbers kept inside their range")
+assertEq(TM.db.evil, nil, "unknown settings ignored")
+assertEq(TM.db.bindings.DRUID["1"], nil, "unknown click kind dropped")
+assertEq(TM.db.bindings.DRUID["2"].text, "Growl", "good click kept")
+assertEq(TM.db.bindings.DRUID["9"], nil, "unknown click dropped")
+TM.db.bindings.DRUID = TM:DefaultBindings(); TM.db.bindings.WARRIOR = nil
+TM.db.width, TM.db.height, TM.db.sortByRole = 120, 24, false
+TM.db.announceText = TM.DEFAULTS.announceText
+TM:ApplySettings()
+-- The Share tab
+SlashCmdList.TAUNTMASTERFOREVER("share")
+assertEq(TM._tabs.current(), "share", "/tm share opens the Share tab")
+local sh = TM._share
+assertEq(sh.outBox:GetText(), TM:ExportSettings(), "the box shows your settings")
+sh.outBox:SetText("typed"); sh.outBox.__scripts.OnTextChanged(sh.outBox, true)
+assertEq(sh.outBox:GetText(), TM:ExportSettings(), "typing in it changes nothing")
+local text = TM:ExportSettings()
+TM.db.width = 150
+sh.inBox:SetText(text)
+C_Timer.After = function() end   -- the 4 seconds to click again haven't passed
+sh.use.__scripts.OnClick(sh.use)
+assertEq(TM.db.width, 150, "one click only asks")
+assertEq(sh.use:GetText(), "Click again", "asks for a second click")
+sh.use.__scripts.OnClick(sh.use)
+assertEq(TM.db.width, 120, "the second click uses them")
+assert(sh.msg:GetText():find("applied"), "says so")
+sh.inBox:SetText("nonsense"); sh.use.__scripts.OnClick(sh.use); sh.use.__scripts.OnClick(sh.use)
+assert(sh.msg:GetText():find("isn't TauntMaster"), "says what's wrong")
+C_Timer.After = realAfter
+closeWin()
 
 step("general tab lists every command")
 TM:OpenConfig("general")

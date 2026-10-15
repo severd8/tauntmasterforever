@@ -189,6 +189,11 @@ local DEFAULTS = {
     roleIcons = true,
     showToT = false,
     tauntFallback = false,   -- no enemy targeted: taunt what their target is fighting
+    backupOnCooldown = false, -- Left Click taunt on cooldown: the click casts the Right Click spell
+    cdOnBars = true,         -- dim the bars while the Left Click taunt is on cooldown
+    stanceWarn = true,       -- header warns in a group when you're out of tank stance, form or seal
+    showPets = false,        -- pet bars in a party
+    mobCount = true,         -- "x3" on a bar when several mobs are on that player
     nameplateMarks = true,   -- mark mobs attacking a non-tank on their nameplates
     tankOnly = false,
     barTexture = "blizzard",
@@ -294,6 +299,141 @@ function TM:SetOwnSettings(on)
     end
     Print(on and "this character now uses its own settings."
         or "this character now uses the settings shared by all your characters.")
+end
+
+---------------------------------------------------------------------------
+-- Sharing settings: /tm share (or the Share tab) turns your settings and click
+-- bindings (every class) into one line of text to copy, and reads one back.
+-- Where the bars sit, whether they're hidden and the minimap button's place stay as they are.
+--
+-- The text is "TMF1:" and a value: T / F, n<number>; , "string" with
+-- %XX for anything but plain letters, digits and punctuation (so the game's
+-- edit boxes leave it alone), or { key value key value ... }.
+---------------------------------------------------------------------------
+local SHARE_PREFIX = "TMF1:"
+local NOT_SHARED = { point = true, minimapAngle = true, shown = true }
+
+local function EncodeString(str)
+    return '"' .. str:gsub('[^%w %.,:;!?()%-_+*/=<>%[%]{}@#$&^~\'`]', function(c)
+        return ("%%%02X"):format(c:byte())
+    end) .. '"'
+end
+
+local function Encode(v, out)
+    local t = type(v)
+    if t == "boolean" then
+        out[#out + 1] = v and "T" or "F"
+    elseif t == "number" then
+        out[#out + 1] = "n" .. ("%.10g"):format(v) .. ";"
+    elseif t == "string" then
+        out[#out + 1] = EncodeString(v)
+    elseif t == "table" then
+        out[#out + 1] = "{"
+        local keys = {}
+        for k in pairs(v) do
+            if type(k) == "string" or type(k) == "number" then keys[#keys + 1] = k end
+        end
+        table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+        for _, k in ipairs(keys) do
+            Encode(k, out)
+            Encode(v[k], out)
+        end
+        out[#out + 1] = "}"
+    end
+end
+
+-- Reads one value at position i; returns the value and the next position, or
+-- nil and an error. Only these four kinds of value, nothing is ever run.
+local function Decode(str, i, depth)
+    if depth > 6 then return nil, "too deeply nested" end
+    local c = str:sub(i, i)
+    if c == "T" then return true, i + 1 end
+    if c == "F" then return false, i + 1 end
+    if c == "n" then
+        local num, after = str:match("^(%-?[%d%.eE%+%-]+);()", i + 1)
+        num = tonumber(num)
+        if not num then return nil, "bad number" end
+        return num, after
+    end
+    if c == '"' then
+        local body, after = str:match('^([^"]*)"()', i + 1)
+        if not body then return nil, "unfinished text" end
+        return (body:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)), after
+    end
+    if c == "{" then
+        local t, pos = {}, i + 1
+        while str:sub(pos, pos) ~= "}" do
+            if pos > #str then return nil, "unfinished table" end
+            local k, v
+            k, pos = Decode(str, pos, depth + 1)
+            if k == nil then return nil, pos end
+            if type(k) ~= "string" and type(k) ~= "number" then return nil, "bad key" end
+            v, pos = Decode(str, pos, depth + 1)
+            if v == nil then return nil, pos end
+            t[k] = v
+        end
+        return t, pos + 1
+    end
+    return nil, "unexpected text"
+end
+
+function TM:ExportSettings()
+    local t = {}
+    for k in pairs(DEFAULTS) do
+        if not NOT_SHARED[k] then t[k] = self.db[k] end
+    end
+    local out = {}
+    Encode(t, out)
+    return SHARE_PREFIX .. table.concat(out)
+end
+
+-- Click bindings from a shared text: a class's list of clicks, each with a
+-- known kind and text. Anything else is dropped.
+local function CleanBindings(list)
+    local valid = {}
+    for _, k in ipairs(TM.KINDS) do valid[k] = true end
+    local clicks = {}
+    for _, c in ipairs(TM.CLICKS) do clicks[c.key] = true end
+    local out = {}
+    for key, b in pairs(list) do
+        if clicks[key] and type(b) == "table" and valid[b.kind] and b.kind ~= "none" and type(b.text) == "string" then
+            out[key] = { kind = b.kind, text = b.text:sub(1, 255) }
+        end
+    end
+    return out
+end
+
+-- Applies settings shared with /tm share. Returns true, or false and why not.
+function TM:ImportSettings(text)
+    text = (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if text:sub(1, #SHARE_PREFIX) ~= SHARE_PREFIX then
+        return false, "that isn't TauntMaster Forever settings text."
+    end
+    if #text > 20000 then return false, "that text is too long." end
+    local ok, t, after = pcall(Decode, text, #SHARE_PREFIX + 1, 0)
+    if not ok or type(t) ~= "table" or after ~= #text + 1 then
+        return false, "that settings text is damaged. Copy it again."
+    end
+    local db = self.db
+    for k, def in pairs(DEFAULTS) do
+        local v = t[k]
+        if not NOT_SHARED[k] and k ~= "bindings" and v ~= nil and type(v) == type(def) and type(v) ~= "table" then
+            db[k] = v
+        end
+    end
+    if type(t.bindings) == "table" then
+        for class, list in pairs(t.bindings) do
+            if type(class) == "string" and type(list) == "table" then db.bindings[class] = CleanBindings(list) end
+        end
+    end
+    PrepareSettings(db)   -- choices and numbers back inside their limits
+    self:LocalizeBindings()
+    if self.built then
+        self:ApplySettings()
+        self:RefreshAll()
+    end
+    self:RefreshOptions()
+    return true
 end
 
 function TM:PlayerClass()
@@ -441,6 +581,49 @@ function TM:CreateUnitButton(parent, unit)
     local status = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     status:SetPoint("RIGHT", -4, 0)
     btn.statusText = status
+
+    -- Taunt on cooldown: a dark cover under the text, and "CD" beside the status
+    local cover = bar:CreateTexture(nil, "OVERLAY", nil, -8)
+    cover:SetAllPoints()
+    cover:SetColorTexture(0, 0, 0, 0.55)
+    cover:Hide()
+    btn.cdCover = cover
+    local cdText = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    cdText:SetPoint("RIGHT", status, "LEFT", -4, 0)
+    cdText:SetText("")
+    btn.cdText = cdText
+
+    -- Mobs on this player, when there's more than one ("x3")
+    local count = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    count:SetPoint("RIGHT", cdText, "LEFT", -4, 0)
+    count:SetTextColor(1, 0.45, 0.2)
+    count:Hide()
+    btn.countText = count
+
+    -- Gold outline that pulses on the player who took a mob off you (lost aggro).
+    -- The outer frame pulses; the inner one's alpha comes from the game, which
+    -- may hide whether this is that player.
+    local glow = CreateFrame("Frame", nil, bar)
+    glow:SetAllPoints()
+    glow:SetAlpha(0)
+    local inner = CreateFrame("Frame", nil, glow)
+    inner:SetAllPoints()
+    for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+        local t = inner:CreateTexture(nil, "OVERLAY")
+        t:SetColorTexture(1, 0.82, 0, 1)
+        if side == "TOP" or side == "BOTTOM" then
+            t:SetPoint(side .. "LEFT"); t:SetPoint(side .. "RIGHT"); t:SetHeight(2)
+        else
+            t:SetPoint("TOP" .. side); t:SetPoint("BOTTOM" .. side); t:SetWidth(2)
+        end
+    end
+    local glowAnim = glow:CreateAnimationGroup()
+    glowAnim:SetLooping("BOUNCE")
+    local glowPulse = glowAnim:CreateAnimation("Alpha")
+    glowPulse:SetFromAlpha(0.2)
+    glowPulse:SetToAlpha(1)
+    glowPulse:SetDuration(0.3)
+    btn.lostGlow, btn.lostGlowInner, btn.lostGlowAnim = glow, inner, glowAnim
 
     local mana = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     mana:SetPoint("LEFT", btn, "RIGHT", 20, 0)
@@ -723,6 +906,9 @@ function TM:UpdateButton(btn)
         btn.bar:SetStatusBarColor(0.25, 0.25, 0.25)
         btn.statusText:SetText(btn.down)
         btn.noTarget:SetAlpha(0)
+        btn.cdCover:Hide()
+        btn.cdText:SetText("")
+        btn.countText:Hide()
         SetFlash(btn, false)
         btn.lastThreat = 0
         return
@@ -734,10 +920,11 @@ function TM:UpdateButton(btn)
     local c = colors[threat] or colors[0]
     btn.bar:SetStatusBarColor(c[1], c[2], c[3])
 
-    -- Someone other than you (and not another tank) has pulled aggro
+    -- Someone other than you (and not another tank) has pulled aggro. Pets often
+    -- hold mobs on purpose, so their bars only change color.
     local isMe = UnitIsUnit(unit, "player")
     if IsSecret(isMe) then isMe = false end
-    local watched = not isMe and role ~= "TANK" and not btn.isToT
+    local watched = not isMe and role ~= "TANK" and not btn.isToT and not btn.isPet
     SetFlash(btn, db.flashAggro and watched and threat >= 2)
     -- Sound plays once when they cross the chosen level (yellow, orange/red or red)
     local level = db.aggroSoundLevel or 2
@@ -760,12 +947,15 @@ function TM:RefreshAll()
     self:UpdateManaWarning()
     self:UpdateCooldowns()
     self:UpdatePlateMarks()
+    self:UpdateMobCounts()
     self:CheckLostAggro()
+    self:UpdateHeader()
 end
 
 ---------------------------------------------------------------------------
 -- Lost aggro: a mob you had firmly (your target) turns to someone else. The
--- header flashes and says so for a few seconds, with the aggro sound if that's on.
+-- header flashes and names who has it now, and that player's bar gets a gold
+-- outline, for a few seconds, with the aggro sound if that's on.
 -- Only shows information; taunting back is still your click.
 ---------------------------------------------------------------------------
 local LOST_AGGRO_SECONDS = 3
@@ -785,9 +975,26 @@ end
 
 function TM:ShowLostAggro()
     local h = self.handle
-    h.text:SetText("Lost aggro!")
+    self.lostAggroOn = true
+    -- Who the mob is on now: its target. The name may be hidden from addons, but
+    -- the game can still write it into the text for us.
+    local who = UnitName("targettarget")
     h.text:SetTextColor(1, 0.35, 0.25)
+    if not IsSecret(who) and type(who) == "string" and who ~= "" then
+        h.text:SetText("Lost aggro: " .. who)
+    elseif not (IsSecret(who) and pcall(h.text.SetFormattedText, h.text, "Lost aggro: %s", who)) then
+        h.text:SetText("Lost aggro!")
+    end
     h.alertAnim:Play()
+    -- Outline that player's bar (the game sets each outline's alpha when it hides who's who)
+    for _, btn in ipairs(self.buttons) do
+        if not btn.isToT and btn:IsVisible() then
+            local a = BoolAlpha(UnitIsUnit(btn.unit, "targettarget"), 1, 0, 0)
+            if pcall(btn.lostGlowInner.SetAlpha, btn.lostGlowInner, a) then
+                btn.lostGlowAnim:Play()
+            end
+        end
+    end
     if self.db.aggroSound then PlayAggroSound(true) end
     self.lostAggroShown = (self.lostAggroShown or 0) + 1
     local shown = self.lostAggroShown
@@ -797,11 +1004,89 @@ function TM:ShowLostAggro()
 end
 
 function TM:ClearLostAggro()
-    local h, gold = self.handle, ns.Theme.C.gold
-    h.text:SetText(ns.Theme.SHORT)
-    h.text:SetTextColor(gold[1], gold[2], gold[3])
+    local h = self.handle
+    self.lostAggroOn = nil
     h.alertAnim:Stop()
     h.alert:SetAlpha(0)
+    for _, btn in ipairs(self.buttons) do
+        btn.lostGlowAnim:Stop()
+        btn.lostGlow:SetAlpha(0)
+    end
+    self.headerProblem = nil   -- repaint the header below
+    self:UpdateHeader()
+end
+
+---------------------------------------------------------------------------
+-- Tank stance reminder: in a group, the header says when you're out of
+-- Defensive Stance or Bear Form, or a Paladin has no Seal of Fury (Judgement
+-- only taunts with it). Classes without a tank stance get nothing.
+---------------------------------------------------------------------------
+-- The stance or form, its index in the stance bar, and its spell IDs (any one learned counts)
+local TANK_STANCE = {
+    WARRIOR = { form = 2, ids = { 71 }, text = "No Defensive Stance" },
+    DRUID = { form = 1, ids = { 5487, 9634 }, text = "No Bear Form" },
+}
+local SEAL_OF_FURY = "Seal of Fury"
+
+-- true / false, or nil when the game can't say
+local function HasPlayerAura(name, spellID)
+    local found = false
+    if C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID and spellID then
+        local ok, aura = pcall(C_UnitAuras.GetPlayerAuraBySpellID, spellID)
+        if not ok or IsSecret(aura) then return nil end
+        if aura then return true end
+        found = true
+    end
+    if C_UnitAuras and C_UnitAuras.GetAuraDataBySpellName then
+        local ok, aura = pcall(C_UnitAuras.GetAuraDataBySpellName, "player", name, "HELPFUL")
+        if not ok or IsSecret(aura) then return nil end
+        if aura then return true end
+        found = true
+    end
+    if found then return false end
+    return nil
+end
+
+-- The reminder to show, or nil
+function TM:StanceProblem()
+    if not (self.db.stanceWarn and (IsInGroup() or IsInRaid())) then return nil end
+    local class = self:PlayerClass()
+    local stance = TANK_STANCE[class]
+    if stance then
+        -- Not learned yet (low level): nothing to remind
+        local learned = false
+        for _, id in ipairs(stance.ids) do
+            if SpellKnown(id) ~= false then learned = true end
+        end
+        if not learned or not GetShapeshiftForm then return nil end
+        local form = GetShapeshiftForm()
+        if IsSecret(form) or type(form) ~= "number" then return nil end
+        if form ~= stance.form then return stance.text end
+    elseif class == "PALADIN" then
+        -- Only once the seal is in the spellbook (the game finds it by name then)
+        local info = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(SEAL_OF_FURY)
+        if not info or IsSecret(info.spellID) or SpellKnown(info.spellID) == false then return nil end
+        if HasPlayerAura(info.name, info.spellID) == false then return "No Seal of Fury" end
+    end
+    return nil
+end
+
+-- The header's text: the lost aggro warning while it shows, else the stance
+-- reminder, else the name
+function TM:UpdateHeader()
+    local h = self.handle
+    if not h or self.lostAggroOn then return end
+    local problem = self:StanceProblem() or false
+    if problem == self.headerProblem then return end
+    self.headerProblem = problem
+    if problem then
+        h.text:SetText(problem)
+        h.text:SetTextColor(1, 0.6, 0.1)
+    else
+        local gold = ns.Theme.C.gold
+        h.text:SetText(ns.Theme.SHORT)
+        h.text:SetTextColor(gold[1], gold[2], gold[3])
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -896,7 +1181,7 @@ function TM:UpdateManaWarning()
     for _, btn in ipairs(self.buttons) do
         local fs = btn.manaText
         local unit = btn.unit
-        if hide or btn.isToT or not btn:IsVisible() or IsDead(unit) then
+        if hide or btn.isToT or btn.isPet or not btn:IsVisible() or IsDead(unit) then
             fs:Hide()
         else
             local isMe = UnitIsUnit(unit, "player")
@@ -956,35 +1241,47 @@ function TM:BuildCooldownIcons()
     end
 end
 
+-- "cd", "ready" or "unknown" for a spell, plus the game's cooldown info
+local function CooldownState(spellID)
+    local cd = C_Spell.GetSpellCooldown(spellID)
+    if cd and not IsSecret(cd.startTime) and not IsSecret(cd.duration) then
+        -- Ignore the global cooldown
+        if cd.startTime > 0 and cd.duration > 1.5 then return "cd", cd end
+        return "ready", cd
+    elseif cd and type(cd.isActive) == "boolean" and not IsSecret(cd.isActive) then
+        -- In instances the times are hidden, but "is it on cooldown" isn't.
+        -- The global cooldown counts as ready.
+        local onGCD = not IsSecret(cd.isOnGCD) and cd.isOnGCD == true
+        if cd.isActive and not onGCD then return "cd", cd end
+        return "ready", cd
+    end
+    return "unknown", cd
+end
+
 function TM:UpdateCooldowns()
     if not self.cdIcons then return end
     local db = self.db
     local bindings = self:GetBindings()
+    self.clickCd = self.clickCd or {}
     for _, b in ipairs(self.cdIcons) do
         local bind = bindings[b.key]
         local spell = bind and self.SPELL_KINDS[bind.kind] and bind.text ~= "" and bind.text
         local info = spell and C_Spell and C_Spell.GetSpellInfo(spell)
-        if not info or db.cdMode == "never" then
+        if not info then
+            self.clickCd[b.key] = nil
             b:Hide()
         else
-            b.icon:SetTexture(info.iconID)
-            local cd = C_Spell.GetSpellCooldown(info.spellID)
-            local state
-            if cd and not IsSecret(cd.startTime) and not IsSecret(cd.duration) then
-                -- Ignore the global cooldown
-                if cd.startTime > 0 and cd.duration > 1.5 then
-                    state = "cd"
-                    b.cd:SetCooldown(cd.startTime, cd.duration)
-                else
-                    state = "ready"
+            local state, cd = CooldownState(info.spellID)
+            self.clickCd[b.key] = state
+            if db.cdMode == "never" then
+                b:Hide()
+            else
+                b.icon:SetTexture(info.iconID)
+                if state == "ready" then
                     b.cd:Clear()
-                end
-            elseif cd and type(cd.isActive) == "boolean" and not IsSecret(cd.isActive) then
-                -- In instances the times are hidden, but "is it on cooldown" isn't.
-                -- The global cooldown counts as ready.
-                local onGCD = not IsSecret(cd.isOnGCD) and cd.isOnGCD == true
-                if cd.isActive and not onGCD then
-                    state = "cd"
+                elseif state == "cd" and cd and not IsSecret(cd.startTime) and not IsSecret(cd.duration) then
+                    b.cd:SetCooldown(cd.startTime, cd.duration)
+                elseif state == "cd" then
                     -- The game's own duration object draws the swipe; hidden times are the fallback
                     local drawn = false
                     if C_Spell.GetSpellCooldownDuration and b.cd.SetCooldownFromDurationObject then
@@ -992,20 +1289,38 @@ function TM:UpdateCooldowns()
                         drawn = ok and pcall(b.cd.SetCooldownFromDurationObject, b.cd, duration)
                     end
                     if not drawn then pcall(b.cd.SetCooldown, b.cd, cd.startTime, cd.duration) end
-                else
-                    state = "ready"
-                    b.cd:Clear()
+                elseif cd then
+                    -- Nothing readable: still draw the swipe, can't tell ready vs not
+                    pcall(b.cd.SetCooldown, b.cd, cd.startTime, cd.duration)
                 end
-            else
-                -- Nothing readable: still draw the swipe, can't tell ready vs not
-                state = "unknown"
-                if cd then pcall(b.cd.SetCooldown, b.cd, cd.startTime, cd.duration) end
+                b.icon:SetDesaturated(state == "cd")
+                b:SetShown(state == "unknown"
+                    or (state == "cd" and db.cdMode == "cooldown")
+                    or (state == "ready" and db.cdMode == "ready"))
             end
-            b.icon:SetDesaturated(state == "cd")
-            b:SetShown(state == "unknown"
-                or (state == "cd" and db.cdMode == "cooldown")
-                or (state == "ready" and db.cdMode == "ready"))
         end
+    end
+    self:UpdateBarCooldowns()
+end
+
+-- Whether a Left Click on a bar would cast nothing because its taunt is on
+-- cooldown: true only when the game says so, and the Right Click backup (if
+-- that's on) is on cooldown too
+function TM:LeftClickOnCooldown()
+    local cd = self.clickCd or {}
+    local bind = self:GetBindings()["1"]
+    if not (bind and (bind.kind == "enemy" or bind.kind == "self")) or cd["1"] ~= "cd" then return false end
+    if self:BackupBinding() then return cd["2"] == "cd" end
+    return true
+end
+
+-- Bars dim and say "CD" while the Left Click taunt is on cooldown
+function TM:UpdateBarCooldowns()
+    local on = self.db.cdOnBars and self:LeftClickOnCooldown()
+    for _, btn in ipairs(self.buttons) do
+        local show = on and not btn.down
+        btn.cdCover:SetShown(show)
+        btn.cdText:SetText(show and "CD" or "")
     end
 end
 
@@ -1126,6 +1441,42 @@ function TM:OnNamePlateRemoved(unit)
 end
 
 ---------------------------------------------------------------------------
+-- Mob count: "x3" on a player's bar when three enemies with a nameplate on
+-- screen are attacking them. Matched by GUID, one lookup per nameplate. Where
+-- the game hides who a mob is attacking (often in instances), it isn't counted.
+---------------------------------------------------------------------------
+function TM:UpdateMobCounts()
+    if not self.buttons then return end
+    local on = self.db.mobCount and UnitGUID ~= nil
+    local byGUID = {}
+    for _, btn in ipairs(self.buttons) do
+        btn.mobs = 0
+        if on and not btn.isToT and btn:IsVisible() then
+            local g = UnitGUID(btn.unit)
+            if g and not IsSecret(g) then byGUID[g] = btn end
+        end
+    end
+    if on and next(byGUID) then
+        for unit in pairs(plates) do
+            local hostile = UnitCanAttack("player", unit)
+            if not IsSecret(hostile) and hostile then
+                local g = UnitGUID(unit .. "target")
+                local btn = g and not IsSecret(g) and byGUID[g]
+                if btn then btn.mobs = btn.mobs + 1 end
+            end
+        end
+    end
+    for _, btn in ipairs(self.buttons) do
+        if btn.mobs >= 2 and not btn.down then
+            btn.countText:SetText("x" .. btn.mobs)
+            btn.countText:Show()
+        else
+            btn.countText:Hide()
+        end
+    end
+end
+
+---------------------------------------------------------------------------
 -- Click bindings -> secure attributes
 ---------------------------------------------------------------------------
 TM.ANNOUNCE_CHANNELS = { "none", "SAY", "YELL", "PARTY", "RAID", "INSTANCE", "RAID_WARNING" }
@@ -1174,25 +1525,34 @@ end
 function TM:OnBarClick(mouseButton, btn)
     pendingAnnounce = nil
     if not CHAT_TYPES[self.db.announceChannel] then return end
-    local bind
+    local key
     if KEYBIND_SUFFIX[mouseButton] then
         -- Keybindings always use the plain Left/Right Click spell, whatever modifier is held
-        bind = self:GetBindings()[KEYBIND_SUFFIX[mouseButton]]
+        key = KEYBIND_SUFFIX[mouseButton]
     else
         local suffix = BUTTON_SUFFIX[mouseButton]
         if not suffix then return end
-        bind = self:GetBindings()[ModifierPrefix() .. suffix]
+        key = ModifierPrefix() .. suffix
     end
+    local bind = self:GetBindings()[key]
     if bind and (bind.kind == "enemy" or bind.kind == "self") and bind.text ~= "" then
         local mobUnit, allyUnit = nil, nil
         if btn then mobUnit, allyUnit = ClickUnits(btn) end
+        local mob = SafeName(mobUnit)
+        -- AoE taunts hit everything around you, not one mob
+        -- (false, not nil, when the name is hidden, so the spell still counts as clicked)
+        local function target(b) return (b.kind == "self") and "Everything nearby" or mob or false end
         pendingAnnounce = {
-            spell = bind.text:lower(),
+            spells = { [bind.text:lower()] = target(bind) },
+            first = target(bind),
             time = GetTime(),
-            -- AoE taunts hit everything around you, not one mob
-            target = (bind.kind == "self") and "Everything nearby" or SafeName(mobUnit),
             player = SafeName(allyUnit),
         }
+        -- The Left Click may cast the Right Click spell instead (taunt on cooldown)
+        local backup = key == "1" and self:BackupBinding()
+        if backup and not pendingAnnounce.spells[backup.text:lower()] then
+            pendingAnnounce.spells[backup.text:lower()] = target(backup)
+        end
     end
 end
 
@@ -1204,17 +1564,19 @@ function TM:OnSpellCastSucceeded(spellID)
         pendingAnnounce = nil
         return
     end
-    -- Make sure it's the clicked spell. If the game hides the spell from addons,
-    -- trust the timing instead.
+    -- Make sure it's the clicked spell (or its backup). If the game hides the
+    -- spell from addons, trust the timing instead.
+    local target = p.first
     if not IsSecret(spellID) and spellID then
         local info = C_Spell and C_Spell.GetSpellInfo(spellID)
         local name = info and info.name
         if not IsSecret(name) then
-            if not name or name:lower() ~= p.spell then return end
+            if not name or p.spells[name:lower()] == nil then return end
+            target = p.spells[name:lower()]
         end
     end
     pendingAnnounce = nil
-    self:SendAnnounce(p.target, p.player)
+    self:SendAnnounce(target or nil, p.player)
 end
 
 -- Fills in {target} and {player}; capitalizes the first letter
@@ -1267,28 +1629,47 @@ function TM:BuildMacro(kind, text, unit, enemyUnit, fallback)
     end
 end
 
--- Secure attributes for one click: clears the old action, then sets the bound one
-function TM:SetClickAttributes(btn, typeAttr, macroAttr, bind)
+-- The Right Click spell, when "use it while the Left Click taunt is on cooldown"
+-- is on and both clicks cast a spell on the player's target. nil otherwise. AoE
+-- taunts aren't used: they'd also go off when the player has no enemy targeted.
+function TM:BackupBinding()
+    if not self.db.backupOnCooldown then return nil end
+    local bindings = self:GetBindings()
+    local left, right = bindings["1"], bindings["2"]
+    local function taunt(b) return b and b.kind == "enemy" and b.text ~= "" end
+    if not (taunt(left) and taunt(right)) or left.text:lower() == right.text:lower() then return nil end
+    return right
+end
+
+-- Secure attributes for one click: clears the old action, then sets the bound one.
+-- backup: a second spell for the macro, cast when the first can't be (on cooldown).
+function TM:SetClickAttributes(btn, typeAttr, macroAttr, bind, backup)
     btn:SetAttribute(typeAttr, nil)
     btn:SetAttribute(macroAttr, nil)
     if not bind or bind.kind == "none" then return end
     if bind.kind == "assist" or bind.kind == "target" then
         btn:SetAttribute(typeAttr, bind.kind)
     elseif bind.text and bind.text ~= "" then
+        local enemy, fallback = btn.isToT and "target" or nil, self.db.tauntFallback and not btn.isToT
+        local macro = self:BuildMacro(bind.kind, bind.text, btn.unit, enemy, fallback)
+        if backup then
+            macro = macro .. "\n" .. self:BuildMacro(backup.kind, backup.text, btn.unit, enemy, fallback)
+        end
         btn:SetAttribute(typeAttr, "macro")
-        btn:SetAttribute(macroAttr, self:BuildMacro(bind.kind, bind.text, btn.unit,
-            btn.isToT and "target" or nil, self.db.tauntFallback and not btn.isToT))
+        btn:SetAttribute(macroAttr, macro)
     end
 end
 
 function TM:ApplyBindingsToButton(btn, bindings)
+    local backup = self:BackupBinding()
     for _, click in ipairs(self.CLICKS) do
-        self:SetClickAttributes(btn, click.typeAttr, click.macroAttr, bindings[click.key])
+        self:SetClickAttributes(btn, click.typeAttr, click.macroAttr, bindings[click.key],
+            click.key == "1" and backup or nil)
     end
     -- Keybindings click with the made-up buttons "TMLeft"/"TMRight". The "*" prefix
     -- matches any modifier, so a controller button bound as e.g. SHIFT-PAD1 still
     -- casts the plain Left/Right Click spell instead of the Shift-click one.
-    self:SetClickAttributes(btn, "*type-tmleft", "*macrotext-tmleft", bindings["1"])
+    self:SetClickAttributes(btn, "*type-tmleft", "*macrotext-tmleft", bindings["1"], backup)
     self:SetClickAttributes(btn, "*type-tmright", "*macrotext-tmright", bindings["2"])
 end
 
@@ -1379,6 +1760,7 @@ function TM:PartySlot(idx)
     return math.floor(idx / upc), idx % upc
 end
 
+-- Returns how many slots the bars took
 function TM:LayoutGroup(list, parent)
     local db = self.db
     if db.sortByRole then list = self:SortedByRole(list) end
@@ -1398,6 +1780,36 @@ function TM:LayoutGroup(list, parent)
         end
     end
     parent:SetSize(1, 1)
+    return idx
+end
+
+-- Pet bars start a new column after the party bars. Pets that are out come
+-- first, so there are no gaps; a pet called during a fight takes a free slot
+-- at the end, and they're tidied up when the fight ends.
+function TM:LayoutPets(partySlots)
+    local db = self.db
+    local w, h, s = db.width, db.height, db.spacing
+    local upc = db.unitsPerColumn
+    local idx = math.ceil(partySlots / upc) * upc
+    local out, away = {}, {}
+    for _, btn in ipairs(self.petButtons) do
+        table.insert(UnitPresent(btn.unit) and out or away, btn)
+    end
+    for _, list in ipairs({ out, away }) do
+        for _, btn in ipairs(list) do
+            btn:SetSize(w, h)
+            btn:ClearAllPoints()
+            if db.showPets then
+                RegisterUnitWatch(btn)
+                local col, row = self:PartySlot(idx)
+                btn:SetPoint("TOPLEFT", self.partyFrame, "TOPLEFT", col * (w + s), -row * (h + s))
+                idx = idx + 1
+            else
+                UnregisterUnitWatch(btn)
+                btn:Hide()
+            end
+        end
+    end
 end
 
 -- Your own bar, when it can be told (the game can hide who's who)
@@ -1462,7 +1874,7 @@ end
 function TM:Layout()
     self:UpdatePreview()   -- not protected: follows the sliders even in combat
     self:RunOutOfCombat("layout", function()
-        self:LayoutGroup(self.partyButtons, self.partyFrame)
+        self:LayoutPets(self:LayoutGroup(self.partyButtons, self.partyFrame))
         self:LayoutRaid()
         self.main:SetScale(self.db.scale)
         self.handle:SetWidth(self.db.width)
@@ -1645,7 +2057,8 @@ function TM:ApplyFonts()
     -- Taunt cooldown icons (not protected, so this is safe in combat)
     if self.cdIcons then
         for _, b in ipairs(self.cdIcons) do b:SetSize(self.db.cdIconSize, self.db.cdIconSize) end
-    end    self:UpdatePreview()
+    end
+    self:UpdatePreview()
 end
 
 function TM:ApplySettings()
@@ -1729,6 +2142,14 @@ function TM:BuildFrames()
     table.insert(self.partyButtons, self:CreateUnitButton(partyFrame, "player"))
     for i = 1, 4 do
         table.insert(self.partyButtons, self:CreateUnitButton(partyFrame, "party" .. i))
+    end
+
+    -- Pet bars (off by default): yours, then your party's
+    self.petButtons = {}
+    for _, unit in ipairs({ "pet", "partypet1", "partypet2", "partypet3", "partypet4" }) do
+        local b = self:CreateUnitButton(partyFrame, unit)
+        b.isPet = true
+        table.insert(self.petButtons, b)
     end
 
     self.raidButtons = {}
@@ -1914,6 +2335,7 @@ TM.COMMANDS = {
     { "/tm spells", "open the Click Bindings tab" },
     { "/tm check", "check your bound spells" },
     { "/tm news", "show what's new" },
+    { "/tm share", "copy or paste your settings" },
     { "/tm reset", "move the bars back to the default position" },
 }
 
@@ -1939,6 +2361,8 @@ SlashCmdList.TAUNTMASTERFOREVER = function(msg)
         TM:SetLocked(msg == "lock")
     elseif msg == "spells" or msg == "display" or msg == "advanced" or msg == "extras" then
         TM:OpenConfig(msg)
+    elseif msg == "share" or msg == "export" or msg == "import" then
+        TM:OpenConfig("share")
     elseif msg == "news" then
         TM:ToggleSplash()
     elseif msg == "check" then
@@ -2004,6 +2428,7 @@ events:RegisterEvent("UPDATE_BINDINGS")
 events:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 events:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
 events:RegisterEvent("PLAYER_TARGET_CHANGED")
+events:RegisterEvent("UNIT_PET")
 events:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" then
         if arg1 ~= ADDON then return end
@@ -2040,8 +2465,10 @@ events:SetScript("OnEvent", function(_, event, arg1)
         TM:UpdateKeyHints()
     elseif event == "SPELL_UPDATE_COOLDOWN" then
         TM:UpdateCooldowns()
+    elseif event == "UNIT_PET" then
+        if TM.db.showPets then TM:Layout() end   -- pets that are out, without gaps
     elseif event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ROLES_ASSIGNED" then
-        if TM.db.sortByRole or IsInRaid() then TM:Layout() end
+        if TM.db.sortByRole or TM.db.showPets or IsInRaid() then TM:Layout() end
         TM:RefreshAll()
     elseif arg1 and TM.unitToButton[arg1] then
         if event == "UNIT_THREAT_SITUATION_UPDATE" then

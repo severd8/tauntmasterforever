@@ -11,15 +11,18 @@ It's a from-scratch rebuild of the classic *TauntMaster* addon, written for Fore
 ## Features
 
 - **Click to taunt.** Click a party or raid member's bar and your taunt is cast on *their* target. Your own target doesn't change.
-- **Aggro at a glance.** Bars turn **yellow** (more threat than the tank), **orange** (being attacked) and **red** (has aggro). A faded bar means your taunt can't reach; a **red X** means that player has no enemy targeted.
+- **Aggro at a glance.** Bars turn **yellow** (more threat than the tank), **orange** (being attacked) and **red** (has aggro). A faded bar means your taunt can't reach; a **red X** means that player has no enemy targeted; **x3** means three mobs are on them.
+- **Know before you click.** While your taunt is on cooldown the bars darken and say **CD**. Optionally, a click whose taunt is on cooldown casts your Right Click taunt instead (like Mocking Blow after Taunt).
 - **Nameplate marks.** The logo appears over any enemy that's attacking someone who isn't a tank. Click its nameplate, then taunt. Needs enemy nameplates (V key).
-- **Lost aggro warning.** When a mob you were tanking turns to someone else, the header above the bars flashes red and says so.
+- **Lost aggro warning.** When a mob you were tanking turns to someone else, the header above the bars flashes red and names who has it, and their bar gets a gold outline.
+- **Stance reminder.** In a group, the header tells you when you're out of Defensive Stance, Bear Form or Seal of Fury.
 - **Bind anything.** Left, Right and Middle click, each with Shift, Ctrl and Alt, to a spell, macro, assist or target, with a picker of your class's taunts.
 - **Keys and controllers.** Bind a key or controller button to taunt off yourself, any party member, your targeted ally or the player under your mouse. The last two work in raids too.
 - **Alerts.** A flashing bar and an optional sound when someone pulls aggro, taunt cooldown icons, and a low mana warning for you and your healers.
 - **Target's target bar and backup taunt.** Taunt what your target is hitting, or (optional) what a player's friendly target is fighting.
 - **Taunt announcements** (optional) in party, raid, instance, say or yell chat, with your own message.
-- **Raids and looks.** Raid bars grouped by raid group; health %, role icons, sort by role, bar textures, text sizes, class colors, colorblind-friendly aggro colors, and a tank-stance-only mode.
+- **Raids, pets and looks.** Raid bars grouped by raid group; optional pet bars; health %, role icons, sort by role, bar textures, text sizes, class colors, colorblind-friendly aggro colors, and a tank-stance-only mode.
+- **Share your setup.** Copy your settings and click bindings as one line of text, for your other characters or a friend.
 - **Settings per character** if you want them, starting from a copy of your shared ones.
 - **In your language.** Your class's taunts are set up with your game's own spell names.
 
@@ -57,12 +60,13 @@ The options have the same look as ToppedOff Forever, Outfitter Forever and Battl
 
 | Tab | What's there |
 |---|---|
-| **Taunts** | Left and Right Click spell pickers (each says what its click does), taunt announcements with a Test button, target's target bar, backup taunt |
+| **Taunts** | Left and Right Click spell pickers (each says what its click does), Right Click as a backup while the Left Click taunt is on cooldown, taunt announcements with a Test button, target's target bar, backup taunt when a player has no enemy targeted |
 | **Click Bindings** | Every mouse button and modifier, with spell names or macros, autocomplete and a spell check as you type. Changes are saved as you make them |
-| **Layout** | Bar width and height, bars per column, raid groups shown, spacing, scale, a preview of the bars while solo; show the bars, lock, include yourself, show raid bars, hide when solo, tank-stance-only mode, sort by role, reset position |
-| **Appearance** | Class colors, role icons, health % (optionally with the aggro word), fading out of reach, the red X, bar texture, aggro colors (standard or colorblind-friendly), text sizes, taunt cooldown icons |
-| **Alerts** | Aggro flash, lost aggro warning, aggro sound (sound choice with a Test button, when it plays, sound channel), low mana warning, nameplate marks |
+| **Layout** | Bar width and height, bars per column, raid groups shown, spacing, scale, a preview of the bars while solo; show the bars, lock, include yourself, show raid bars, hide when solo, tank-stance-only mode, sort by role, pet bars, reset position |
+| **Appearance** | Class colors, role icons, health % (optionally with the aggro word), fading out of reach, the red X, bar texture, aggro colors (standard or colorblind-friendly), mob count, text sizes, taunt cooldown icons, dimming the bars while your taunt is on cooldown |
+| **Alerts** | Aggro flash, lost aggro warning, tank stance, form and seal reminder, aggro sound (sound choice with a Test button, when it plays, sound channel), low mana warning, nameplate marks |
 | **General** | Keybinding hints, minimap button, welcome screen, settings for this character only, command list |
+| **Share** | Your settings as one line of text to copy, and a box to paste someone else's |
 
 In a custom macro, `{unit}` is replaced with the clicked player (for example `/cast [@{unit}target] Growl`).
 
@@ -89,6 +93,7 @@ Bound keys appear beside each party bar, so you always know which button saves w
 | `/tm spells` | Open the options at Click Bindings |
 | `/tm check` | Check that your bound spells exist and are learned |
 | `/tm news` | Show the welcome / what's new window |
+| `/tm share` | Copy your settings, or paste someone else's |
 | `/tm reset` | Move the bars back to their default position |
 
 `/tauntmaster` works too.
@@ -103,6 +108,7 @@ WoW: Forever limits what addons can do in combat. TauntMaster Forever is built a
 - **In some instances the game hides threat from addons.** The lost aggro warning then stays quiet rather than guess.
 - **Say and Yell announcements** only work inside instances. **Raid Warning** needs leader or assist; without it, announcements go to raid chat.
 - **Tank-stance-only mode** is for Warriors and Druids; it's greyed out for Paladins, who have no tank stance.
+- **The mob count** only counts enemies whose nameplates are on screen, and inside dungeons the game often hides who a mob is attacking, so it's mostly for the open world.
 
 ## Troubleshooting
 

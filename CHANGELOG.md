@@ -1,3 +1,15 @@
+## 1.15.0
+
+Know before you click, and know who to save.
+
+- New: **bars dim while your taunt is on cooldown.** The bars darken and say CD while your Left Click taunt can't be cast, so you know a click won't land. On by default; the switch is in Appearance > Taunt cooldowns.
+- New: **Right Click as a backup** (Taunts tab, off by default). When your Left Click taunt is on cooldown or out of its range, the click casts your Right Click spell instead, like Mocking Blow after Taunt. Both clicks must be a spell on the player's target.
+- New: **stance reminder.** In a group, the header says "No Defensive Stance", "No Bear Form" or "No Seal of Fury" until you fix it. On by default (Alerts tab).
+- The **lost aggro warning** now names who has the mob ("Lost aggro: Aeri") and puts a gold outline on their bar.
+- New: **pet bars** (Layout tab, off by default) for your pet and your party's pets, in a column after the party bars. Click one to taunt what the pet is fighting. They change color but don't flash.
+- New: **mob count.** "x3" on a player's bar when three enemies are attacking them. Counts enemies whose nameplates are on screen; inside dungeons the game often hides this. On by default (Appearance tab).
+- New: **Share tab** and `/tm share`. Copy your settings and click bindings (every class) as one line of text, and paste someone else's. Where your bars sit stays as it is.
+
 ## 1.14.7
 
 A full review of the options window: clearer, more consistent, and every setting explains itself.

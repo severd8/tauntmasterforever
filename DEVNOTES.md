@@ -17,7 +17,7 @@ A tanking addon for **World of Warcraft: Forever** (interface 16001, client 1.60
 - `Bindings.xml` — keybindings (loaded automatically by WoW, not listed in the `.toc`). Each is a `CLICK` binding on a bar (`TauntMasterForever_player`, `_party1`–`_party4`) or one of the hidden buttons `TauntMasterForever_ally` (unit `target`) and `TauntMasterForever_mouseover` (unit `mouseover`), both in `TM.hiddenButtons`, using the made-up mouse buttons `TMLeft`/`TMRight`. Their secure attributes are `*type-tmleft` / `*macrotext-tmleft` etc.; the `*` matches any modifier so controller buttons with modifiers still use the plain Left/Right Click spell. Binding names are set in `Core.lua` (`BINDING_NAME_...`). Only these buttons, the options and welcome windows (for Escape) and the minimap button have global names; nothing else does (`TM.KEYBIND_BAR_UNITS`).
 - `tests/` — offline test suite (not shipped). `wowstub.lua` fakes the WoW API; `run_tests.lua` holds the scenarios; `run.lua` runs them.
 - `CHANGELOG.md` — release notes shown on CurseForge. Newest version at the top.
-- `CURSEFORGE.md` — the CurseForge project description, pasted by hand (not shipped).
+- `CURSEFORGE.md` — the CurseForge project description, pasted by hand (not shipped). Kept short and timeless on purpose: what the addon does, how to start, links to the changelog and the README. It names no single option, tab or command beyond `/tm`, so new features don't need it changed.
 - `.pkgmeta` — packager config (folder name, changelog, files to leave out of the download).
 - `.github/workflows/test.yml` — runs the tests on every push. `release.yml` — on a `v*` tag, runs the tests, then packages and uploads to CurseForge.
 
@@ -67,7 +67,7 @@ The stub's `UnitGUID` follows `MOB_TARGET` for nameplate targets, and `CD_BY_ID[
 ## Releasing
 
 1. Make the change, run the tests, add a new section at the top of `CHANGELOG.md` (e.g. `## 1.7.1`), and add the matching entry at the top of `News.lua`.
-   If the change shows on the CurseForge project page (features, options, commands), update `CURSEFORGE.md` too (the README, adjusted: no logo, a short install note, full links), and **give the whole updated file in the reply as one Markdown code block**, ready to paste into the project's description (Edit project → Description, Markdown editor). Do this every time the file changes, without being asked. The packager only uploads `CHANGELOG.md` with each file; the description never changes on its own.
+   Leave `CURSEFORGE.md` alone unless the addon's basics change (what it is, supported classes, how to install, the links). If it does change, give the whole file in the reply as one Markdown code block, ready to paste (Edit project → Description, Markdown editor). New features go in `CHANGELOG.md` and the README, not the description.
 2. Commit and push to `main`. The **Tests** workflow must be green.
 3. Tag and push the tag: `git tag v1.7.1 && git push origin v1.7.1`. Tags containing `beta` or `alpha` upload as Beta/Alpha files.
 4. The **Package and release** workflow runs the tests again, then uploads to CurseForge. Check the Actions tab for a green check and the CurseForge Files page (new files go through CurseForge review).

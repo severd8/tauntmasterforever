@@ -35,9 +35,15 @@ Found a bug or have an idea? Please [submit it on GitHub](https://github.com/sev
 
 TauntMaster Forever is free. If it has saved your group a wipe, you can [leave a small tip on Ko-fi](https://ko-fi.com/tauntmasterforever). Thank you!
 
-## Also by me
+## All addons by me
 
-**ToppedOff Forever**, **Outfitter Forever**, **GatherPath Forever**, **BattleText Forever**, **AuctionHouse Forever** and **ARS Forever** (Azeroth Revenue Service), all free on CurseForge.
+- **TauntMaster Forever**: one-click taunts off your healers and DPS, for tanks.
+- **ToppedOff Forever**: reminds you when buffs, food, reagents, ammo or gear need topping off.
+- **Outfitter Forever**: save your gear as outfits and switch between them with one click, or let them change by themselves.
+- **BattleText Forever**: scrolling combat text for your hits, heals and the damage you take.
+- **AuctionHouse Forever**: a bigger Auction House window, so long item names stop getting cut off.
+- **GatherPath Forever**: the shortest gathering route through your GatherMate2 herb and ore nodes, on the world map and minimap.
+- **ARS Forever** (Azeroth Revenue Service): see how much gold a player has made and the most they've ever held, for you and anyone you inspect.
 
 ## Credits
 

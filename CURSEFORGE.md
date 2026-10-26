@@ -37,7 +37,7 @@ TauntMaster Forever is free. If it has saved your group a wipe, you can [leave a
 
 ## Also by me
 
-**ToppedOff Forever**, **Outfitter Forever**, **BattleText Forever** and **AuctionHouse Forever**, all free on CurseForge.
+**ToppedOff Forever**, **Outfitter Forever**, **BattleText Forever**, **AuctionHouse Forever** and **ARS Forever** (Azeroth Revenue Service), all free on CurseForge.
 
 ## Credits
 

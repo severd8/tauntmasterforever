@@ -129,6 +129,7 @@ TauntMaster Forever is free. If it has saved your group a wipe, you can [leave a
 - **Outfitter Forever**: the classic Outfitter gear manager, ported to WoW Forever. Free on CurseForge.
 - **BattleText Forever**: scrolling combat text for your hits, heals and the damage you take. Free on CurseForge.
 - **AuctionHouse Forever**: a bigger Auction House window, so long item names stop getting cut off and you see more results at once. Free on CurseForge.
+- **ARS Forever** (Azeroth Revenue Service): gold statistics, total gold earned and peak gold, for you and for players you inspect, with snapshots to compare over time. Free on CurseForge.
 
 ## Credits
 

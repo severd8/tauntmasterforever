@@ -6,6 +6,9 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.15.1", date = "2026-11-06", items = {
+        "Fixed: the low mana note no longer runs under the Warn at slider.",
+    } },
     { version = "1.15.0", date = "2026-10-15", items = {
         "Bars dim and say CD while your taunt is on cooldown. Optional: Right Click as the backup.",
         "Lost aggro names who has the mob and outlines their bar. Stance, form and seal reminder.",

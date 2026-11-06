@@ -891,8 +891,10 @@ local function BuildAlertsTab(p)
     local mana = Card(p, "Low mana", 0, -232, PAGE_W, 72)
     Switch(mana, "Show a low mana warning", 12, -30, "hideManaWarning",
         { invert = true, onChange = function() TM:UpdateManaWarning() end,
-          tip = "Shown beside the bar of a player who's low on mana." })
-    MutedNote(mana, "For you, and your healers (everyone with mana when no one has the healer role).", NOTE_X, -52)
+          tip = "Shown beside the bar of a player who's low on mana: you, and your healers "
+            .. "(everyone with mana when no one has the healer role)." })
+    -- Kept to the left column, clear of the slider beside it
+    MutedNote(mana, "For you and your healers.", NOTE_X, -52, COL2 - NOTE_X - 16)
     local warnAt = FlatSlider(mana, "Warn at", COL2, -30, HALF_W - 20, "manaWarnPct",
         { suffix = "%", onChange = function() TM:UpdateManaWarning() end })
     AddState(function() warnAt:SetDisabled(TM.db.hideManaWarning) end)

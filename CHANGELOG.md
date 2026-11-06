@@ -1,3 +1,7 @@
+## 1.15.1
+
+- Fixed: on the Alerts tab, the note under "Show a low mana warning" ran under the Warn at slider.
+
 ## 1.15.0
 
 Know before you click, and know who to save.

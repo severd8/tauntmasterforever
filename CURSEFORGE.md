@@ -17,7 +17,7 @@ It's a from-scratch rebuild of the classic *TauntMaster* addon, written for Fore
 
 Install it with the CurseForge app, or unzip the download into your WoW: Forever `Interface\AddOns` folder, then restart the game or type `/reload`.
 
-Type `/tm` to open the options. Drag the red header to move the bars.
+Type `/tmf` to open the options. Drag the red header to move the bars.
 
 See the **Changelog** on the Files tab for what's new in each version, and the [full guide on GitHub](https://github.com/severd8/tauntmasterforever#readme) for every feature and command.
 

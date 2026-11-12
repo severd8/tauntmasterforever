@@ -1,4 +1,4 @@
--- TauntMaster Forever: the tabbed options window (/tm).
+-- TauntMaster Forever: the tabbed options window (/tmf).
 
 local _, ns = ...
 local TM = ns.TM
@@ -777,7 +777,7 @@ local function BuildLayoutTab(p)
 
     local vis = Card(p, "Visibility & order", 0, -194, PAGE_W, 180)
     Switch(vis, "Show the bars", 12, -30, "shown",
-        { tip = "Same as /tm show and /tm hide, or right-clicking the minimap button." })
+        { tip = "Same as /tmf show and /tmf hide, or right-clicking the minimap button." })
     Switch(vis, "Lock bars", 12, -30 - ROW, "locked",
         { tip = "Stops the header from being dragged. Right-click the header to lock or unlock too." })
     Switch(vis, "Include yourself", 12, -30 - 2 * ROW, "showPlayer", { tip = "Shows a bar for you, in a party and in a raid." })
@@ -795,7 +795,7 @@ local function BuildLayoutTab(p)
     local reset = FlatButton(vis, "Reset position", 130)
     reset:SetPoint("TOPLEFT", 12, -142)
     reset:SetScript("OnClick", function() SlashCmdList.TAUNTMASTERFOREVER("reset") end)
-    Tip(reset, "Reset position", "Moves the bars back to where they start. Same as /tm reset.")
+    Tip(reset, "Reset position", "Moves the bars back to where they start. Same as /tmf reset.")
     local preview = FlatButton(vis, "Preview bars", 130)
     preview:SetPoint("LEFT", reset, "RIGHT", 8, 0)
     preview:SetScript("OnClick", function(self)
@@ -916,7 +916,7 @@ local function BuildGeneralTab(p)
     Switch(other, "Show minimap button", 12, -30, "minimap",
         { tip = "Left-click it for these options, right-click to show or hide the bars." })
     Switch(other, "Show welcome screen after updates", 12, -30 - ROW, "showSplash",
-        { onChange = function() end, tip = "What's new, once after each update. /tm news shows it anytime." })
+        { onChange = function() end, tip = "What's new, once after each update. /tmf news shows it anytime." })
     -- Not a saved setting itself: it picks which settings this character uses
     local own = T.LabeledSwitch(other, "This character uses its own settings", 12, -30 - 2 * ROW)
     own:SetScript("OnClick", function()
@@ -1075,7 +1075,7 @@ local function BuildWindow()
     win = T.Window({
         name = "TauntMasterForeverConfig",
         tabs = TABS,
-        hint = "/tm opens these options. /tm news shows what's new.",
+        hint = "/tmf opens these options. /tmf news shows what's new.",
         version = function() return TM.CurrentNewsVersion and TM:CurrentNewsVersion() end,
         onShow = RunRefreshers,
         onHide = function()
@@ -1096,7 +1096,7 @@ TM.optionsRefresh = function()
 end
 
 ---------------------------------------------------------------------------
--- Entry point: /tm, minimap, header menu
+-- Entry point: /tmf, minimap, header menu
 --   nil toggles the window; a name opens that tab (older names still work)
 ---------------------------------------------------------------------------
 local TAB_ALIASES = { display = "taunts", spells = "bindings", advanced = "appearance", extras = "alerts" }

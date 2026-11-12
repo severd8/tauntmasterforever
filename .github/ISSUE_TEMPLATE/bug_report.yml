@@ -46,7 +46,7 @@ body:
     id: version
     attributes:
       label: Addon version
-      description: Shown in your AddOns list, or type /tm debug in game.
+      description: Shown in your AddOns list, or type /tmf debug in game.
       placeholder: v1.7.0
   - type: textarea
     id: error

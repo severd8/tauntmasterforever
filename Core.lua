@@ -48,7 +48,7 @@ TM.NO_TEXT_KINDS = { none = true, assist = true, target = true }   -- kinds that
 
 local function B(kind, text, id) return { kind = kind, text = text or "", id = id } end
 
--- Forever tank kits (verify in-game with /tm check):
+-- Forever tank kits (verify in-game with /tmf check):
 --   Warrior: Taunt, Mocking Blow, Challenging Shout
 --   Druid:   Growl, Challenging Roar (Bear Form)
 --   Paladin: Judgement taunts while Seal of Fury is active
@@ -313,7 +313,7 @@ function TM:SetOwnSettings(on)
 end
 
 ---------------------------------------------------------------------------
--- Sharing settings: /tm share (or the Share tab) turns your settings and click
+-- Sharing settings: /tmf share (or the Share tab) turns your settings and click
 -- bindings (every class) into one line of text to copy, and reads one back.
 -- Where the bars sit, whether they're hidden and the minimap button's place stay as they are.
 --
@@ -414,7 +414,7 @@ local function CleanBindings(list)
     return out
 end
 
--- Applies settings shared with /tm share. Returns true, or false and why not.
+-- Applies settings shared with /tmf share. Returns true, or false and why not.
 function TM:ImportSettings(text)
     text = (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if text:sub(1, #SHARE_PREFIX) ~= SHARE_PREFIX then
@@ -2336,11 +2336,11 @@ function TM:CheckSpells()
             Print(("%s: |cff40ff40%s (ID %d) — OK.|r"):format(click.label, bind.text, info.spellID))
         end
     end)
-    if not any then Print("No spells bound. Open /tm spells.") end
+    if not any then Print("No spells bound. Open /tmf spells.") end
 end
 
 -- "TauntMaster Forever loaded. Growl assigned to Left Click, Challenging Roar assigned to Right Click."
--- Spells the client can't find are flagged in red, so no manual /tm check is needed.
+-- Spells the client can't find are flagged in red, so no manual /tmf check is needed.
 function TM:PrintLoadMessage()
     local parts = {}
     self:EachSpellBinding(function(click, bind)
@@ -2354,24 +2354,24 @@ function TM:PrintLoadMessage()
     if #parts > 0 then
         msg = msg .. " " .. table.concat(parts, ", ") .. "."
     else
-        msg = msg .. " No taunts assigned — type /tm to pick one."
+        msg = msg .. " No taunts assigned — type /tmf to pick one."
     end
     print(msg)
 end
 
--- Every command, for /tm help and the options' General tab
+-- Every command, for /tmf help and the options' General tab
 TM.COMMANDS = {
-    { "/tm", "open or close the options" },
-    { "/tm show", "show the bars" },
-    { "/tm hide", "hide the bars" },
-    { "/tm toggle", "show or hide the bars" },
-    { "/tm lock", "lock the bars in place" },
-    { "/tm unlock", "unlock the bars to drag them" },
-    { "/tm spells", "open the Click Bindings tab" },
-    { "/tm check", "check your bound spells" },
-    { "/tm news", "show what's new" },
-    { "/tm share", "copy or paste your settings" },
-    { "/tm reset", "move the bars back to the default position" },
+    { "/tmf", "open or close the options" },
+    { "/tmf show", "show the bars" },
+    { "/tmf hide", "hide the bars" },
+    { "/tmf toggle", "show or hide the bars" },
+    { "/tmf lock", "lock the bars in place" },
+    { "/tmf unlock", "unlock the bars to drag them" },
+    { "/tmf spells", "open the Click Bindings tab" },
+    { "/tmf check", "check your bound spells" },
+    { "/tmf news", "show what's new" },
+    { "/tmf share", "copy or paste your settings" },
+    { "/tmf reset", "move the bars back to the default position" },
 }
 
 local function Help()
@@ -2379,7 +2379,7 @@ local function Help()
     for _, c in ipairs(TM.COMMANDS) do Print(c[1] .. " — " .. c[2]) end
 end
 
-SLASH_TAUNTMASTERFOREVER1 = "/tm"
+SLASH_TAUNTMASTERFOREVER1 = "/tmf"
 SLASH_TAUNTMASTERFOREVER2 = "/tauntmaster"
 SlashCmdList.TAUNTMASTERFOREVER = function(msg)
     msg = (msg or ""):lower():match("^%s*(.-)%s*$")

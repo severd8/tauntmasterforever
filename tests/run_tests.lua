@@ -517,7 +517,7 @@ local splash = TM._splash
 assert(splash and splash.__shown, "splash shown on first login")
 assertEq(TM.db.lastSeenVersion, TM:CurrentNewsVersion(), "version remembered")
 local txt = splash.text:GetText()
-assert(txt:find("Quick start") and txt:find("What's new") and txt:find("/tm news"), "splash has quick start and news")
+assert(txt:find("Quick start") and txt:find("What's new") and txt:find("/tmf news"), "splash has quick start and news")
 local newsLines = 0
 for _ in txt:gmatch("\n%- |cffffd100v") do newsLines = newsLines + 1 end
 assertEq(newsLines, 6, "six latest changes listed")
@@ -530,13 +530,13 @@ assertEq(splash.__shown, true, "shown after an update"); splash:Hide()
 -- Turned off: not shown after updates
 TM.db.lastSeenVersion = "1.0.0"; TM.db.showSplash = false; TM:MaybeShowSplash()
 assertEq(splash.__shown, false, "respects the checkbox")
--- /tm news toggles it regardless
-SlashCmdList.TAUNTMASTERFOREVER("news"); assertEq(splash.__shown, true, "/tm news opens it")
+-- /tmf news toggles it regardless
+SlashCmdList.TAUNTMASTERFOREVER("news"); assertEq(splash.__shown, true, "/tmf news opens it")
 assertEq(splash.check:IsOn(), false, "switch reflects setting")
 splash.check.__scripts.OnClick(splash.check)
 assertEq(TM.db.showSplash, true, "switch turns it back on")
 assertEq(splash.check:IsOn(), true, "switch repaints")
-SlashCmdList.TAUNTMASTERFOREVER("news"); assertEq(splash.__shown, false, "/tm news closes it")
+SlashCmdList.TAUNTMASTERFOREVER("news"); assertEq(splash.__shown, false, "/tmf news closes it")
 local esc = false
 for _, n in ipairs(UISpecialFrames) do if n == "TauntMasterForeverSplash" then esc = true end end
 assert(esc, "Escape closes the splash")
@@ -558,7 +558,7 @@ for _, k in ipairs({ "taunts", "bindings", "layout", "appearance", "alerts", "ge
     assertEq(tabs.buttons[k].selBg.__shown, true, "selected tab highlighted")
 end
 -- Old names still open the right tab
-TM:OpenConfig("spells"); assertEq(tabs.current(), "bindings", "/tm spells -> Click Bindings")
+TM:OpenConfig("spells"); assertEq(tabs.current(), "bindings", "/tmf spells -> Click Bindings")
 TM:OpenConfig("extras"); assertEq(tabs.current(), "alerts", "extras -> Alerts")
 TM:OpenConfig("advanced"); assertEq(tabs.current(), "appearance", "advanced -> Appearance")
 TM:OpenConfig("display"); assertEq(tabs.current(), "taunts", "display -> Taunts")
@@ -1258,10 +1258,10 @@ assertEq(TM.db.shown, true, "and shows them again")
 lockSw.__scripts.OnClick(lockSw); lockSw.__scripts.OnClick(lockSw)
 for i = logged + 1, #LOG do assert(not LOG[i]:find("locked%.") and not LOG[i]:find("shown%."), "switches don't chat: " .. LOG[i]) end
 SlashCmdList.TAUNTMASTERFOREVER("hide")
-assertEq(showSw.on, false, "/tm hide repaints the open window")
+assertEq(showSw.on, false, "/tmf hide repaints the open window")
 SlashCmdList.TAUNTMASTERFOREVER("show")
 SlashCmdList.TAUNTMASTERFOREVER("lock")
-assertEq(lockSw.on, true, "/tm lock repaints the open window")
+assertEq(lockSw.on, true, "/tmf lock repaints the open window")
 SlashCmdList.TAUNTMASTERFOREVER("unlock")
 
 step("options: greyed-out settings")
@@ -1636,7 +1636,7 @@ TM.db.announceText = TM.DEFAULTS.announceText
 TM:ApplySettings()
 -- The Share tab
 SlashCmdList.TAUNTMASTERFOREVER("share")
-assertEq(TM._tabs.current(), "share", "/tm share opens the Share tab")
+assertEq(TM._tabs.current(), "share", "/tmf share opens the Share tab")
 local sh = TM._share
 assertEq(sh.outBox:GetText(), TM:ExportSettings(), "the box shows your settings")
 sh.outBox:SetText("typed"); sh.outBox.__scripts.OnTextChanged(sh.outBox, true)
@@ -1659,11 +1659,11 @@ closeWin()
 step("general tab lists every command")
 TM:OpenConfig("general")
 local shownCmds = 0
-walk(win, function(f) if f.__kind == "FontString" and f.__text and f.__text:find("^|cff8fd3ff/tm") then shownCmds = shownCmds + 1 end end)
+walk(win, function(f) if f.__kind == "FontString" and f.__text and f.__text:find("^|cff8fd3ff/tmf") then shownCmds = shownCmds + 1 end end)
 assertEq(shownCmds, #TM.COMMANDS, "one line per command")
 local from2 = #LOG
 SlashCmdList.TAUNTMASTERFOREVER("help")
-assertEq(#LOG - from2, #TM.COMMANDS + 1, "/tm help lists the same commands")
+assertEq(#LOG - from2, #TM.COMMANDS + 1, "/tmf help lists the same commands")
 closeWin()
 step("taunt alerts")
 local function cast(unit, id, guid) TM._onTauntCast(unit, guid or ("g" .. math.random(1e9)), id) end
@@ -1741,4 +1741,25 @@ TM.db.groupTauntPopup, TM.db.ownTauntPopup = false, false
 TM.db.groupTauntSound, TM.db.ownTauntSound = "none", "none"
 TM:ApplySettings()
 STATE.inGroup, STATE.party = false, 0; STATE.unitsExist = { player = true }
+step("slash commands leave the game's own alone")
+-- /tm is the game's /targetmarker shortcut; taking it broke marker macros (issue #8).
+local BLIZZARD_SLASH = { ["/tm"] = true, ["/targetmarker"] = true, ["/wm"] = true, ["/worldmarker"] = true,
+    ["/cwm"] = true, ["/clearworldmarker"] = true, ["/t"] = true, ["/tar"] = true, ["/target"] = true }
+local ours = {}
+for i = 1, 9 do
+    local cmd = _G["SLASH_TAUNTMASTERFOREVER" .. i]
+    if cmd then
+        assert(not BLIZZARD_SLASH[cmd:lower()], cmd .. " belongs to the game")
+        ours[cmd] = true
+    end
+end
+assert(ours["/tmf"] and ours["/tauntmaster"], "/tmf and /tauntmaster are registered")
+for _, c in ipairs(TM.COMMANDS) do
+    local word = c[1]:match("^(%S+)")
+    assert(ours[word], c[1] .. " in the help uses a registered command")
+end
+for _, f in ipairs({ "Core.lua", "Options.lua", "News.lua", "Splash.lua", "TauntWatch.lua", "README.md", "CURSEFORGE.md" }) do
+    local h = assert(io.open(f, "r")); local text = h:read("*a"); h:close()
+    assert(not (text .. " "):find("/tm[^%w_]"), f .. " still tells players to type /tm")
+end
 print("ALL TESTS PASSED")

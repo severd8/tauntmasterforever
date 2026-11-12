@@ -50,8 +50,8 @@ Taunts cast on "their target" go to the enemy the clicked player is fighting. Bl
 ## Using it
 
 - **Move the bars** — drag the red header. Lock them in place from the header's right-click menu or the options.
-- **Open the options** — type `/tm`, left-click the minimap button, or right-click the header and choose **Settings**.
-- **Show or hide the bars** — right-click the minimap button, or type `/tm toggle`.
+- **Open the options** — type `/tmf`, left-click the minimap button, or right-click the header and choose **Settings**.
+- **Show or hide the bars** — right-click the minimap button, or type `/tmf toggle`.
 
 ### Options window
 
@@ -87,14 +87,14 @@ Bound keys appear beside each party bar, so you always know which button saves w
 
 | Command | Does |
 |---|---|
-| `/tm` | Open or close the options |
-| `/tm show` · `/tm hide` · `/tm toggle` | Show or hide the bars |
-| `/tm lock` · `/tm unlock` | Lock or unlock the bars' position |
-| `/tm spells` | Open the options at Click Bindings |
-| `/tm check` | Check that your bound spells exist and are learned |
-| `/tm news` | Show the welcome / what's new window |
-| `/tm share` | Copy your settings, or paste someone else's |
-| `/tm reset` | Move the bars back to their default position |
+| `/tmf` | Open or close the options |
+| `/tmf show` · `/tmf hide` · `/tmf toggle` | Show or hide the bars |
+| `/tmf lock` · `/tmf unlock` | Lock or unlock the bars' position |
+| `/tmf spells` | Open the options at Click Bindings |
+| `/tmf check` | Check that your bound spells exist and are learned |
+| `/tmf news` | Show the welcome / what's new window |
+| `/tmf share` | Copy your settings, or paste someone else's |
+| `/tmf reset` | Move the bars back to their default position |
 
 `/tauntmaster` works too.
 
@@ -113,9 +113,9 @@ WoW: Forever limits what addons can do in combat. TauntMaster Forever is built a
 ## Troubleshooting
 
 - **A click on a healer does nothing** — they probably have a friend targeted, not the mob. See **Good to know** above.
-- **A click does nothing** — type `/tm check`. It lists each bound spell and whether it was found and learned. Fix any misspelled spell on the **Click Bindings** tab.
-- **The bars disappeared** — type `/tm show`, or turn on **Show the bars** on the **Layout** tab. If they're still hidden, turn off **Hide when solo** or tank-stance-only mode there.
-- **The bars are off-screen** — type `/tm reset`.
+- **A click does nothing** — type `/tmf check`. It lists each bound spell and whether it was found and learned. Fix any misspelled spell on the **Click Bindings** tab.
+- **The bars disappeared** — type `/tmf show`, or turn on **Show the bars** on the **Layout** tab. If they're still hidden, turn off **Hide when solo** or tank-stance-only mode there.
+- **The bars are off-screen** — type `/tmf reset`.
 - **No nameplate marks** — turn on enemy nameplates (V key), and check that **Nameplate marks** is on in the **Alerts** tab.
 
 ## Feedback and bug reports

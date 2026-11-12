@@ -1,6 +1,6 @@
 -- TauntMaster Forever: welcome / "What's new" splash screen.
 -- Shows once after each update (and on first install), unless turned off.
--- /tm news opens it anytime.
+-- /tmf news opens it anytime.
 
 local _, ns = ...
 local TM = ns.TM
@@ -30,8 +30,8 @@ local function BuildText()
     add("- |cffffffffClick a bar|r to taunt that player's target")
     add("- |cffffffffRight-click|r the bar header for Lock / Settings")
     add("- " .. RED .. "Red X|r = that player has no enemy targeted")
-    add("- " .. BLUE .. "/tm|r  open options      " .. BLUE .. "/tm toggle|r  show / hide bars")
-    add("- " .. BLUE .. "/tm check|r  check your spells      " .. BLUE .. "/tm news|r  show this window again")
+    add("- " .. BLUE .. "/tmf|r  open options      " .. BLUE .. "/tmf toggle|r  show / hide bars")
+    add("- " .. BLUE .. "/tmf check|r  check your spells      " .. BLUE .. "/tmf news|r  show this window again")
     add(" ")
 
     add(ORANGE .. "# What's new|r")

@@ -6,6 +6,9 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.16.1", date = "2026-11-12", items = {
+        "The command is now /tmf (or /tauntmaster), so the game's own target marker command works again.",
+    } },
     { version = "1.16.0", date = "2026-11-12", items = {
         "Taunt alerts: a popup, and a sound if you like, when your group or their pets taunt (Taunt Alerts tab).",
     } },
@@ -15,7 +18,7 @@ TM.NEWS = {
     { version = "1.15.0", date = "2026-10-15", items = {
         "Bars dim and say CD while your taunt is on cooldown. Optional: Right Click as the backup.",
         "Lost aggro names who has the mob and outlines their bar. Stance, form and seal reminder.",
-        "Optional pet bars, a mob count on each bar, and /tm share to copy your settings.",
+        "Optional pet bars, a mob count on each bar, and /tmf share to copy your settings.",
     } },
     { version = "1.14.7", date = "2026-10-12", items = {
         "Options review: hover help on every setting, and Click Bindings save as you go.",
@@ -50,7 +53,7 @@ TM.NEWS = {
         "Fixes for settings changed during a fight and for nameplate marks after a /reload in combat. Lighter in raids.",
     } },
     { version = "1.13.2", date = "2026-10-01", items = {
-        "Clearer option text for nameplate marks and /tm reset.",
+        "Clearer option text for nameplate marks and /tmf reset.",
     } },
     { version = "1.13.1", date = "2026-09-30", items = {
         "The bar header keeps the same look when locked.",
@@ -75,7 +78,7 @@ TM.NEWS = {
         "Aggro sound: choose the sound, when it plays, and which volume slider it follows.",
     } },
     { version = "1.10.0", date = "2026-09-29", items = {
-        "Welcome screen with quick-start tips and recent changes. Reopen it with /tm news.",
+        "Welcome screen with quick-start tips and recent changes. Reopen it with /tmf news.",
     } },
     { version = "1.9.1", date = "2026-09-29", items = {
         "Keybindings have their own TauntMaster Forever section.",

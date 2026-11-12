@@ -16,6 +16,7 @@ It's a from-scratch rebuild of the classic *TauntMaster* addon, written for Fore
 - **Nameplate marks.** The logo appears over any enemy that's attacking someone who isn't a tank. Click its nameplate, then taunt. Needs enemy nameplates (V key).
 - **Bind anything.** Left, Right and Middle click, each with Shift, Ctrl and Alt, to a spell, macro, assist or target, with a picker of your class's taunts. Keys and controller buttons work too.
 - **Alerts.** A flashing bar and an optional sound when someone pulls aggro; a warning on the header when a mob you were tanking turns away, naming who has it, with a gold outline on their bar; a reminder when you're out of Defensive Stance, Bear Form or Seal of Fury; taunt cooldown icons; and a low mana warning for you and your healers.
+- **Taunt alerts** (optional). A popup when anyone in your group or their pet taunts, or when you do, with a sound of your choice. Handy for spotting a hunter pet's stray Growl or another tank picking up a mob.
 - **Target's target bar and backup taunt.** Taunt what your target is hitting, or (optional) what a player's friendly target is fighting.
 - **Taunt announcements** (optional) in party, raid, instance, say or yell chat, with your own message.
 - **Raids, pets and looks.** Raid bars grouped by raid group; optional pet bars; health %, role icons, sort by role, bar textures, text sizes, class colors, colorblind-friendly aggro colors, and a tank-stance-only mode.
@@ -63,6 +64,7 @@ Settings are grouped into tabs down the left side of the options window. Hover o
 | **Layout** | Bar width and height, bars per column, raid groups shown, spacing, scale, a preview of the bars while solo; show the bars, lock, include yourself, show raid bars, hide when solo, tank-stance-only mode, sort by role, pet bars, reset position |
 | **Appearance** | Class colors, role icons, health % (optionally with the aggro word), fading out of reach, the red X, bar texture, aggro colors (standard or colorblind-friendly), mob count, text sizes, taunt cooldown icons, dimming the bars while your taunt is on cooldown |
 | **Alerts** | Aggro flash, lost aggro warning, tank stance, form and seal reminder, aggro sound (sound choice with a Test button, when it plays, sound channel), low mana warning, nameplate marks |
+| **Taunt Alerts** | Popups for your group's taunts (pets included) and your own, text size, a sound for each (12 to choose from, with Test buttons), sound channel, test, move and reset the popup |
 | **General** | Keybinding hints, minimap button, welcome screen, settings for this character only, command list |
 | **Share** | Your settings as one line of text to copy, and a box to paste someone else's |
 
@@ -106,6 +108,7 @@ WoW: Forever limits what addons can do in combat. TauntMaster Forever is built a
 - **Say and Yell announcements** only work inside instances. **Raid Warning** needs leader or assist; without it, announcements go to raid chat.
 - **Tank-stance-only mode** is for Warriors and Druids; it's greyed out for Paladins, who have no tank stance.
 - **The mob count** only counts enemies whose nameplates are on screen, and inside dungeons the game often hides who a mob is attacking, so it's mostly for the open world.
+- **Taunt alerts for other players** need the game to show their spells to addons. In some dungeons and raids it doesn't, and their taunts can't show there.
 
 ## Troubleshooting
 

@@ -1,3 +1,9 @@
+## 1.16.0
+
+- New: **taunt alerts** (new Taunt Alerts tab, off by default). A popup at the top of the screen when anyone in your group or their pet taunts, like "Fluffy (Aeri's pet) taunted Defias Thug with Growl", and a separate switch for your own taunts. Covers warrior, druid, hunter pet and Voidwalker taunts.
+- Each kind can play a sound: pick from 12 (or none), with Test buttons and a sound channel. The popup can be tested, moved and resized.
+- In some dungeons and raids the game hides other players' spells from addons; their taunts can't show there.
+
 ## 1.15.1
 
 - Fixed: on the Alerts tab, the note under "Show a low mana warning" ran under the Warn at slider.

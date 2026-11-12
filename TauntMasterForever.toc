@@ -13,5 +13,6 @@
 Theme.lua
 Core.lua
 News.lua
+TauntWatch.lua
 Options.lua
 Splash.lua

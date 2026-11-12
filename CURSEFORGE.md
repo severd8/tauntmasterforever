@@ -9,7 +9,7 @@ It's a from-scratch rebuild of the classic *TauntMaster* addon, written for Fore
 ## What it does
 
 - **One click to taunt.** Click a player's bar and your taunt is cast on the enemy they're fighting. Your own target doesn't change.
-- **See trouble early.** Bars change color as a player gains threat, and alerts tell you when someone pulls aggro or a mob turns away from you.
+- **See trouble early.** Bars change color as a player gains threat, and alerts tell you when someone pulls aggro, a mob turns away from you, or anyone in your group (pets included) taunts.
 - **Your class's taunts, ready to go.** Warriors, Druids and Paladins are set up automatically, and every click, key or controller button can be bound to what you like.
 - **Made to fit you.** Parties and raids, sizes, colors, alerts and announcements are all in one options window. Hover over any setting to see what it does.
 

@@ -204,6 +204,14 @@ local DEFAULTS = {
     announceText = "{target} has been taunted off of {player}!",
     point = { "CENTER", "CENTER", -300, 0 },
     bindings = {},
+    -- Taunt alerts (TauntWatch.lua): a popup when someone in the group, or you, taunts
+    groupTauntPopup = false,
+    ownTauntPopup = false,
+    groupTauntSound = "none",
+    ownTauntSound = "none",
+    tauntSoundChannel = "Master",
+    tauntPopupSize = 18,
+    tauntPopupPoint = { "TOP", "TOP", 0, -190 },
 }
 
 TM.DEFAULTS = DEFAULTS
@@ -214,6 +222,7 @@ TM.LIMITS = {
     unitsPerColumn = { 1, 20 }, maxColumns = { 1, 8 }, scale = { 0.5, 2 },
     headerFontSize = { 8, 20 }, nameFontSize = { 8, 20 },
     manaWarnPct = { 5, 50 }, cdIconSize = { 16, 64 },
+    tauntPopupSize = { 12, 32 },
 }
 
 -- Fills in missing settings. A saved value of the wrong type (a damaged or
@@ -257,6 +266,8 @@ local function PrepareSettings(db)
         aggroSoundKey = TM.AGGRO_SOUND_KEYS, aggroSoundLevel = TM.AGGRO_LEVEL_KEYS,
         aggroSoundChannel = TM.SOUND_CHANNEL_KEYS, announceChannel = TM.ANNOUNCE_CHANNELS,
         barTexture = TM.TEXTURE_KEYS, threatColors = TM.THREAT_PALETTE_KEYS, cdMode = TM.CD_MODE_KEYS,
+        groupTauntSound = TM.TAUNT_SOUND_KEYS, ownTauntSound = TM.TAUNT_SOUND_KEYS,
+        tauntSoundChannel = TM.SOUND_CHANNEL_KEYS,
     }
     for key, list in pairs(choices) do
         local ok = false
@@ -703,24 +714,47 @@ TM.AGGRO_LEVEL_LABELS = { "Close to pulling (yellow)", "Has aggro (orange or red
 TM.SOUND_CHANNEL_KEYS = { "Master", "SFX", "Dialog" }
 TM.SOUND_CHANNEL_LABELS = { Master = "Master", SFX = "Sound Effects", Dialog = "Dialog" }
 
+-- Sounds for taunt alerts: the aggro sounds, more short alert sounds, and none
+TM.TAUNT_SOUNDS = { { key = "none", label = "No sound", try = {} } }
+for _, s in ipairs(TM.AGGRO_SOUNDS) do table.insert(TM.TAUNT_SOUNDS, s) end
+for _, s in ipairs({
+    { key = "whisper",  label = "Whisper",        try = { "TELL_MESSAGE", 3081 } },
+    { key = "mapping",  label = "Map ping",       try = { "MAP_PING", 3175 } },
+    { key = "invite",   label = "Group invite",   try = { "IG_PLAYER_INVITE", 880 } },
+    { key = "queue",    label = "Queue pop",      try = { "PVP_THROUGH_QUEUE", 8459 } },
+    { key = "quest",    label = "Quest complete", try = { "IG_QUEST_LIST_COMPLETE", 878 } },
+    { key = "toast",    label = "Friend online",  try = { "UI_BNET_TOAST", 18019 } },
+}) do table.insert(TM.TAUNT_SOUNDS, s) end
+TM.TAUNT_SOUND_KEYS, TM.TAUNT_SOUND_LABELS = {}, {}
+for _, s in ipairs(TM.TAUNT_SOUNDS) do
+    table.insert(TM.TAUNT_SOUND_KEYS, s.key)
+    TM.TAUNT_SOUND_LABELS[s.key] = s.label
+end
+
+-- Plays the sound picked from a list (each lists fallbacks: sound kit names, then
+-- IDs; the first one the game can play is used). True if one played.
+function TM:PlaySoundChoice(list, key, channel)
+    local choice = list[1]
+    for _, s in ipairs(list) do
+        if s.key == key then choice = s break end
+    end
+    for _, k in ipairs(choice.try) do
+        local id = k
+        if type(k) == "string" then id = SOUNDKIT and SOUNDKIT[k] end
+        if id then
+            local ok, willPlay = pcall(PlaySound, id, channel or "Master")
+            if ok and willPlay then return true end
+        end
+    end
+    return false
+end
+
 local lastAggroSound = 0
 local function PlayAggroSound(force)
     local now = GetTime()
     if not force and now - lastAggroSound < 1.5 then return end
     lastAggroSound = now
-    local choice = TM.AGGRO_SOUNDS[1]
-    for _, s in ipairs(TM.AGGRO_SOUNDS) do
-        if s.key == TM.db.aggroSoundKey then choice = s break end
-    end
-    local channel = TM.db.aggroSoundChannel or "Master"
-    for _, k in ipairs(choice.try) do
-        local id = k
-        if type(k) == "string" then id = SOUNDKIT and SOUNDKIT[k] end
-        if id then
-            local ok, willPlay = pcall(PlaySound, id, channel)
-            if ok and willPlay then return end
-        end
-    end
+    TM:PlaySoundChoice(TM.AGGRO_SOUNDS, TM.db.aggroSoundKey, TM.db.aggroSoundChannel)
 end
 
 -- "Test" button and picking a new sound in the options
@@ -2069,6 +2103,7 @@ function TM:ApplySettings()
     self:ApplyBindings()
     self:UpdateMinimapButton()
     self:UpdatePreview()
+    if self.UpdateTauntWatch then self:UpdateTauntWatch() end
     -- Said once per fight, not for every switch flipped during it
     if InCombatLockdown() and not self.combatNoticeShown then
         self.combatNoticeShown = true

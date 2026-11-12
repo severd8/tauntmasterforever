@@ -582,7 +582,7 @@ cdChoice.Choose("cooldown")
 -- Dropdowns open a menu; picking an item saves it
 MENUS = {}
 local chanDropdown
-walk(cfg, function(f) if f.__kind == "Button" and f.Choose and f.__text == "Master" then chanDropdown = f end end)
+walk(cfg, function(f) if not chanDropdown and f.__kind == "Button" and f.Choose and f.__text == "Master" then chanDropdown = f end end)
 assert(chanDropdown, "sound channel dropdown found")
 chanDropdown.__scripts.OnClick(chanDropdown)
 local menu = MENUS[#MENUS]
@@ -1665,4 +1665,80 @@ local from2 = #LOG
 SlashCmdList.TAUNTMASTERFOREVER("help")
 assertEq(#LOG - from2, #TM.COMMANDS + 1, "/tm help lists the same commands")
 closeWin()
+step("taunt alerts")
+local function cast(unit, id, guid) TM._onTauntCast(unit, guid or ("g" .. math.random(1e9)), id) end
+local function top()
+    local pop = TM._tauntPopup()
+    local text = pop and pop.lines[1].__text
+    if text == "" then return nil end
+    return text
+end
+STATE.inGroup, STATE.party = true, 2
+STATE.unitsExist = { player = true, party1 = true, party2 = true }
+TM.db.groupTauntPopup, TM.db.ownTauntPopup = false, false; TM:ApplySettings()
+cast("party1", 6795)
+assertEq(top(), nil, "off by default: nothing shows")
+TM.db.groupTauntPopup = true; TM:ApplySettings()
+cast("party1", 6795)
+assertEq(top(), "Name_party1 taunted Name_party1target with Growl", "a group member's taunt")
+cast("partypet2", 6795)
+assertEq(top(), "Name_partypet2 (Name_party2's pet) taunted Name_partypet2target with Growl", "a group member's pet")
+assertEq(TM._tauntPopup().lines[2].__text, "Name_party1 taunted Name_party1target with Growl", "older line moves down")
+cast("party2", 5209)
+assertEq(top(), "Name_party2 used Challenging Roar on everything nearby", "AoE taunts")
+local before = top()
+cast("party1", 1126)
+assertEq(top(), before, "other spells don't show")
+cast("nameplate1", 6795)
+assertEq(top(), before, "only group members and their pets")
+SECRET_MODE = true; local hiddenID = UnitHealth("x"); SECRET_MODE = false
+cast("party1", hiddenID)
+assertEq(top(), before, "a hidden spell shows nothing")
+cast("party1", 6795, "same"); cast("raid2", 6795, "same")
+assertEq(TM._tauntPopup().lines[2].__text, before, "one cast seen under two names shows once")
+cast("player", 6795)
+assertEq(top(), "Name_party1 taunted Name_party1target with Growl", "your own taunts need their own switch")
+TM.db.ownTauntPopup = true
+cast("player", 6795)
+assertEq(top(), "You taunted Name_playertarget with Growl", "your own taunt")
+cast("pet", 6795)
+assertEq(top(), "Your pet Name_pet taunted Name_pettarget with Growl", "your pet's taunt")
+-- Sounds: none by default, the chosen one when set
+local from = #LOG
+cast("party1", 6795)
+for i = from + 1, #LOG do assert(not LOG[i]:find("^SOUND"), "no sound by default") end
+TM.db.groupTauntSound = "raidwarning"; FAKE_TIME = FAKE_TIME + 1
+from = #LOG; cast("party1", 6795)
+local played = false
+for i = from + 1, #LOG do if LOG[i]:find("^SOUND 8959") then played = true end end
+assert(played, "group taunt sound plays")
+TM.db.ownTauntSound = "queue"; FAKE_TIME = FAKE_TIME + 1
+from = #LOG; cast("player", 6795)
+played = false
+for i = from + 1, #LOG do if LOG[i]:find("^SOUND 8459") then played = true end end
+assert(played, "own taunt sound plays")
+-- Options tab: test, move, reset
+TM:OpenConfig("tauntalerts")
+assertEq(TM._tabs.current(), "tauntalerts", "taunt alerts tab")
+local moveBtn
+walk(win, function(f) if f.__kind == "Button" and (f.__text == "Move popup" or f.__text == "Lock popup") then moveBtn = f end end)
+if TM.tauntPopupMoving then moveBtn.__scripts.OnClick(moveBtn) end
+moveBtn.__scripts.OnClick(moveBtn)
+assertEq(TM.tauntPopupMoving, true, "move mode on")
+local pop = TM._tauntPopup()
+pop.__scripts.OnDragStop(pop)
+assertEq(TM.db.tauntPopupPoint[1], "CENTER", "dragging saves the place")
+closeWin()
+assertEq(TM.tauntPopupMoving, false, "closing the options locks the popup")
+TM:ResetTauntPopupPosition()
+assertEq(TM.db.tauntPopupPoint[3], 0, "reset puts it back")
+-- Damaged saved choices
+TauntMasterForeverDB.groupTauntSound = "trumpet"; TauntMasterForeverDB.tauntPopupSize = 99
+fire("ADDON_LOADED", ADDON)
+assertEq(TM.db.groupTauntSound, "none", "unknown sound back to default")
+assertEq(TM.db.tauntPopupSize, 32, "text size brought into range")
+TM.db.groupTauntPopup, TM.db.ownTauntPopup = false, false
+TM.db.groupTauntSound, TM.db.ownTauntSound = "none", "none"
+TM:ApplySettings()
+STATE.inGroup, STATE.party = false, 0; STATE.unitsExist = { player = true }
 print("ALL TESTS PASSED")

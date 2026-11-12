@@ -6,6 +6,9 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.16.0", date = "2026-11-12", items = {
+        "Taunt alerts: a popup, and a sound if you like, when your group or their pets taunt (Taunt Alerts tab).",
+    } },
     { version = "1.15.1", date = "2026-11-06", items = {
         "Fixed: the low mana note no longer runs under the Warn at slider.",
     } },

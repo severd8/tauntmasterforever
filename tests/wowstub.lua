@@ -131,6 +131,7 @@ GameFontNormalSmall = newObj("Font", "GameFontNormalSmall")
 GameFontNormal = newObj("Font", "GameFontNormal")
 GameFontDisable = newObj("Font", "GameFontDisable")
 GameFontHighlight = newObj("Font", "GameFontHighlight")
+GameFontNormalHuge = newObj("Font", "GameFontNormalHuge")
 function GameTooltip_SetDefaultAnchor() end
 
 -- World state the tests control

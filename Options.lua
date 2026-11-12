@@ -938,6 +938,54 @@ local function BuildGeneralTab(p)
 end
 
 -- Share: your settings as one line of text, and back
+local function BuildTauntAlertsTab(p)
+    local pop = Card(p, "Taunt popups", 0, 0, PAGE_W, 128)
+    Switch(pop, "Show taunts by your group", 12, -30, "groupTauntPopup",
+        { tip = "A popup when anyone in your party or raid, or their pet, taunts: "
+            .. "warriors, druids, hunter pets and Voidwalkers." })
+    Switch(pop, "Show your own taunts", 12, -30 - ROW, "ownTauntPopup",
+        { tip = "A popup when you or your pet taunts." })
+    FlatSlider(pop, "Text size", COL2, -30, HALF_W - 20, "tauntPopupSize",
+        { onChange = function() TM:UpdateTauntWatch() end, tip = "The size of the popup text." })
+    MutedNote(pop, "In some dungeons and raids the game hides other players' spells from addons; "
+        .. "their taunts can't show there.", NOTE_X, -30 - 2 * ROW - 4, PAGE_W - NOTE_X - 12)
+
+    local snd = Card(p, "Sounds", 0, -138, PAGE_W, 114)
+    local function soundRow(label, key, kind, y, tip)
+        RowLabel(snd, label, 12, y - 2)
+        Choice(snd, 150, y, 170, TM.TAUNT_SOUND_KEYS, TM.TAUNT_SOUND_LABELS, key,
+            { onChange = function() TM:TestTauntSound(kind) end, tipTitle = label,
+              tip = tip .. " Picking one plays it." })
+        local test = FlatButton(snd, "Test", 60)
+        test:SetPoint("TOPLEFT", 326, y)
+        test:SetScript("OnClick", function() TM:TestTauntSound(kind) end)
+        Tip(test, "Test", "Plays the sound.")
+    end
+    soundRow("Group taunts", "groupTauntSound", "group", -28, "Played with a group member's taunt popup.")
+    soundRow("Your taunts", "ownTauntSound", "own", -56, "Played with your own taunt popup.")
+    RowLabel(snd, "Sound channel", 12, -86)
+    Choice(snd, 150, -84, 170, TM.SOUND_CHANNEL_KEYS, TM.SOUND_CHANNEL_LABELS, "tauntSoundChannel",
+        { tipTitle = "Sound channel", tip = "Which of the game's volume sliders these sounds follow." })
+
+    local where = Card(p, "Where it shows", 0, -262, PAGE_W, 84)
+    local test = FlatButton(where, "Test popup", 120)
+    test:SetPoint("TOPLEFT", 12, -30)
+    test:SetScript("OnClick", function() TM:TestTauntPopup() end)
+    Tip(test, "Test popup", "Shows two sample taunts, so you can see the size and place.")
+    local move = FlatButton(where, "Move popup", 120)
+    move:SetPoint("LEFT", test, "RIGHT", 8, 0)
+    move:SetScript("OnClick", function(self)
+        TM:SetTauntPopupMoving(not TM.tauntPopupMoving)
+        self:SetText(TM.tauntPopupMoving and "Lock popup" or "Move popup")
+    end)
+    Tip(move, "Move popup", "Shows where the popup goes; drag it, then click Lock popup.")
+    AddRefresher(function() move:SetText(TM.tauntPopupMoving and "Lock popup" or "Move popup") end)
+    local reset = FlatButton(where, "Reset position", 130)
+    reset:SetPoint("LEFT", move, "RIGHT", 8, 0)
+    reset:SetScript("OnClick", function() TM:ResetTauntPopupPosition() end)
+    Tip(reset, "Reset position", "Puts the popup back near the top of the screen.")
+end
+
 local function BuildShareTab(p)
     local out = Card(p, "Copy your settings", 0, 0, PAGE_W, 116)
     MutedNote(out, "Your settings and click bindings (for every class) as one line of text. Click Select, "
@@ -1011,6 +1059,8 @@ local TABS = {
     { key = "layout",     label = "Layout",         icon = "Interface\\Icons\\INV_Misc_Spyglass_03",       build = BuildLayoutTab },
     { key = "appearance", label = "Appearance",     icon = "Interface\\Icons\\INV_Fabric_Silk_02",         build = BuildAppearanceTab },
     { key = "alerts",     label = "Alerts",         icon = "Interface\\Icons\\Ability_Warrior_BattleShout", build = BuildAlertsTab },
+    -- Icon: the hunter pet's Growl, looked up when the window is built
+    { key = "tauntalerts", label = "Taunt Alerts",  icon = "Interface\\Icons\\Ability_Physical_Taunt", spellIcon = 2649, build = BuildTauntAlertsTab },
     { key = "general",    label = "General",        icon = "Interface\\Icons\\INV_Misc_Gear_01",           build = BuildGeneralTab },
     { key = "share",      label = "Share",          icon = "Interface\\Icons\\INV_Scroll_03",              build = BuildShareTab },
 }
@@ -1018,6 +1068,10 @@ local TABS = {
 local pages, tabButtons = {}, {}   -- filled when the window is built
 
 local function BuildWindow()
+    for _, t in ipairs(TABS) do
+        local info = t.spellIcon and C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(t.spellIcon)
+        if info and info.iconID then t.icon = info.iconID end
+    end
     win = T.Window({
         name = "TauntMasterForeverConfig",
         tabs = TABS,
@@ -1028,6 +1082,7 @@ local function BuildWindow()
             HideSuggest()
             SaveAllRows()        -- a spell box still being typed in
             TM:SetPreview(false)
+            if TM.tauntPopupMoving then TM:SetTauntPopupMoving(false) end
         end,
         onTab = HideSuggest,
     })

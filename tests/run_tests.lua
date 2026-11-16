@@ -1741,6 +1741,63 @@ TM.db.groupTauntPopup, TM.db.ownTauntPopup = false, false
 TM.db.groupTauntSound, TM.db.ownTauntSound = "none", "none"
 TM:ApplySettings()
 STATE.inGroup, STATE.party = false, 0; STATE.unitsExist = { player = true }
+step("hide in battlegrounds")
+assertEq(TM.db.hideInBattlegrounds, false, "battleground hiding off by default")
+local savedTankOnly = TM.db.tankOnly
+TM.db.tankOnly = false; TM:ApplySettings()
+STATE.inGroup, STATE.party = true, 2
+STATE.unitsExist = { player = true, party1 = true, party2 = true }
+fire("GROUP_ROSTER_UPDATE"); tick()
+INSTANCE, INSTANCE_TYPE = true, "pvp"
+fire("PLAYER_ENTERING_WORLD", false, false)
+assertEq(TM.main.__driver, "show", "switch off: shown in a battleground")
+TM.db.hideInBattlegrounds = true; TM:ApplySettings()
+assertEq(TM.main.__driver, "hide", "switch on in a battleground: hidden at once")
+MOB_TARGET = { nameplate5 = "party2" }
+fire("NAME_PLATE_UNIT_ADDED", "nameplate5")
+assertEq(PLATES.nameplate5.tmForeverMark and PLATES.nameplate5.tmForeverMark.__shown or false, false,
+    "no nameplate marks in a battleground")
+-- Leaving: back again
+INSTANCE, INSTANCE_TYPE = false, "party"
+fire("PLAYER_ENTERING_WORLD", false, false)
+assertEq(TM.main.__driver, "show", "shown again after leaving")
+TM:UpdatePlateMarks()
+assertEq(PLATES.nameplate5.tmForeverMark.__shown, true, "nameplate marks back after leaving")
+-- Dungeons, raids and arenas don't count
+for _, kind in ipairs({ "party", "raid", "arena" }) do
+    INSTANCE, INSTANCE_TYPE = true, kind
+    fire("ZONE_CHANGED_NEW_AREA")
+    assertEq(TM.main.__driver, "show", "shown in instance type " .. kind)
+end
+-- Hide when solo still applies on top
+TM.db.showSolo = false; TM:ApplySettings()
+assertEq(TM.main.__driver, "[group] show; hide", "hide when solo outside a battleground")
+INSTANCE_TYPE = "pvp"; fire("ZONE_CHANGED_NEW_AREA")
+assertEq(TM.main.__driver, "hide", "battleground wins over hide when solo")
+TM.db.showSolo = true
+INSTANCE, INSTANCE_TYPE = false, "party"; TM:ApplySettings()
+-- Arriving mid-fight: nothing protected changes until combat ends
+COMBAT = true; BLOCKED = {}
+INSTANCE, INSTANCE_TYPE = true, "pvp"
+fire("ZONE_CHANGED_NEW_AREA")
+assertEq(#BLOCKED, 0, "no protected change in combat")
+assertEq(TM.main.__driver, "show", "still shown until combat ends")
+COMBAT = false; fire("PLAYER_REGEN_ENABLED")
+assertEq(TM.main.__driver, "hide", "hidden once combat ends")
+-- A secret answer never hides
+INSTANCE_SECRET = true; fire("ZONE_CHANGED_NEW_AREA")
+assertEq(TM.main.__driver, "show", "secret instance type: shown")
+INSTANCE_SECRET = false; fire("ZONE_CHANGED_NEW_AREA")
+assertEq(TM.main.__driver, "hide", "readable again: hidden")
+-- Turning the switch off in a battleground shows it straight away
+TM.db.hideInBattlegrounds = false; TM:ApplySettings()
+assertEq(TM.main.__driver, "show", "switch off in a battleground: shown")
+INSTANCE, INSTANCE_TYPE = false, "party"; fire("PLAYER_ENTERING_WORLD", false, false)
+MOB_TARGET = {}
+TM.db.tankOnly = savedTankOnly; TM:ApplySettings()
+STATE.inGroup, STATE.party = false, 0; STATE.unitsExist = { player = true }
+fire("GROUP_ROSTER_UPDATE"); tick()
+
 step("slash commands leave the game's own alone")
 -- /tm is the game's /targetmarker shortcut; taking it broke marker macros (issue #8).
 local BLIZZARD_SLASH = { ["/tm"] = true, ["/targetmarker"] = true, ["/wm"] = true, ["/worldmarker"] = true,

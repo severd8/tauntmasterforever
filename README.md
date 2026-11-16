@@ -61,7 +61,7 @@ Settings are grouped into tabs down the left side of the options window. Hover o
 |---|---|
 | **Taunts** | Left and Right Click spell pickers (each says what its click does), Right Click as a backup while the Left Click taunt is on cooldown, taunt announcements with a Test button, target's target bar, backup taunt when a player has no enemy targeted |
 | **Click Bindings** | Every mouse button and modifier, with spell names or macros, autocomplete and a spell check as you type. Changes are saved as you make them |
-| **Layout** | Bar width and height, bars per column, raid groups shown, spacing, scale, a preview of the bars while solo; show the bars, lock, include yourself, show raid bars, hide when solo, tank-stance-only mode, sort by role, pet bars, reset position |
+| **Layout** | Bar width and height, bars per column, raid groups shown, spacing, scale, a preview of the bars while solo; show the bars, lock, include yourself, show raid bars, hide when solo, hide in battlegrounds, tank-stance-only mode, sort by role, pet bars, reset position |
 | **Appearance** | Class colors, role icons, health % (optionally with the aggro word), fading out of reach, the red X, bar texture, aggro colors (standard or colorblind-friendly), mob count, text sizes, taunt cooldown icons, dimming the bars while your taunt is on cooldown |
 | **Alerts** | Aggro flash, lost aggro warning, tank stance, form and seal reminder, aggro sound (sound choice with a Test button, when it plays, sound channel), low mana warning, nameplate marks |
 | **Taunt Alerts** | Popups for your group's taunts (pets included) and your own, text size, a sound for each (12 to choose from, with Test buttons), sound channel, test, move and reset the popup |
@@ -114,7 +114,7 @@ WoW: Forever limits what addons can do in combat. TauntMaster Forever is built a
 
 - **A click on a healer does nothing** — they probably have a friend targeted, not the mob. See **Good to know** above.
 - **A click does nothing** — type `/tmf check`. It lists each bound spell and whether it was found and learned. Fix any misspelled spell on the **Click Bindings** tab.
-- **The bars disappeared** — type `/tmf show`, or turn on **Show the bars** on the **Layout** tab. If they're still hidden, turn off **Hide when solo** or tank-stance-only mode there.
+- **The bars disappeared** — type `/tmf show`, or turn on **Show the bars** on the **Layout** tab. If they're still hidden, turn off **Hide when solo**, **Hide in battlegrounds** or tank-stance-only mode there.
 - **The bars are off-screen** — type `/tmf reset`.
 - **No nameplate marks** — turn on enemy nameplates (V key), and check that **Nameplate marks** is on in the **Alerts** tab.
 

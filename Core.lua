@@ -164,6 +164,7 @@ local DEFAULTS = {
     unitsPerColumn = 5,
     maxColumns = 8,
     showSolo = true,
+    hideInBattlegrounds = false, -- hide everything while inside a battleground
     showSplash = true,
     showInRaid = true,
     showPlayer = true,
@@ -1455,7 +1456,7 @@ end
 -- Every nameplate on screen, or just `only` (one that has just appeared)
 function TM:UpdatePlateMarks(only)
     if not (self.db and C_NamePlate and C_NamePlate.GetNamePlateForUnit) then return end
-    local on = self.db.nameplateMarks and (IsInGroup() or IsInRaid())
+    local on = self.db.nameplateMarks and (IsInGroup() or IsInRaid()) and not self:HiddenInBattleground()
     local members = on and WatchedMembers()
     local function update(unit)
         if not (on and pcall(self.UpdatePlateMark, self, unit, members)) then pcall(HideMark, unit) end
@@ -2004,6 +2005,29 @@ local TANK_COND = { WARRIOR = "stance:2", DRUID = "form:1" }
 -- Whether "Only in tank stance or form" means anything for your class
 function TM:HasTankStance() return TANK_COND[self:PlayerClass()] ~= nil end
 
+-- Inside a battleground ("pvp"; arenas are "arena" and don't count)
+function TM:InBattleground()
+    if not IsInInstance then return false end
+    local ok, inside, kind = pcall(IsInInstance)
+    if not ok or IsSecret(inside) or IsSecret(kind) then return false end
+    return inside == true and kind == "pvp"
+end
+
+-- "Hide in battlegrounds" is on and we're in one
+function TM:HiddenInBattleground()
+    return self.db.hideInBattlegrounds and self:InBattleground() or false
+end
+
+-- Entering the world or a new zone: show or hide for battlegrounds. Hiding is
+-- a protected change, so ApplyVisibility waits for the end of combat.
+function TM:CheckBattleground()
+    local hidden = self:HiddenInBattleground()
+    if hidden == self.bgHidden then return end
+    self.bgHidden = hidden
+    self:ApplyVisibility()
+    self:UpdatePlateMarks()
+end
+
 function TM:ApplyVisibility()
     self:RunOutOfCombat("visibility", function()
         local db = self.db
@@ -2011,9 +2035,11 @@ function TM:ApplyVisibility()
         UnregisterStateDriver(self.partyFrame, "visibility")
         UnregisterStateDriver(self.raidFrame, "visibility")
 
-        -- Whole addon (header, icons, warning): hidden entirely, or only when solo
+        -- Whole addon (header, icons, warning): hidden entirely, in a
+        -- battleground, or only when solo
         local mainCond = "show"
-        if not db.shown then
+        self.bgHidden = self:HiddenInBattleground()
+        if not db.shown or self.bgHidden then
             mainCond = "hide"
         else
             local parts = {}
@@ -2464,6 +2490,8 @@ events:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 events:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
 events:RegisterEvent("PLAYER_TARGET_CHANGED")
 events:RegisterEvent("UNIT_PET")
+events:RegisterEvent("PLAYER_ENTERING_WORLD")
+events:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 events:SetScript("OnEvent", function(_, event, arg1)
     if event == "ADDON_LOADED" then
         if arg1 ~= ADDON then return end
@@ -2496,6 +2524,8 @@ events:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "PLAYER_TARGET_CHANGED" then
         TM.lastTargetThreat = nil   -- a new mob: nothing was lost
         TM:CheckLostAggro()
+    elseif event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
+        TM:CheckBattleground()
     elseif event == "UPDATE_BINDINGS" then
         TM:UpdateKeyHints()
     elseif event == "SPELL_UPDATE_COOLDOWN" then

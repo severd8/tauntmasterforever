@@ -224,7 +224,13 @@ for n, info in pairs(KNOWN) do info.name = n end
 BY_ID_ONLY = { [694] = { spellID = 694, iconID = 6, name = "Mocking Blow" } }
 INSTANCE = false
 LOCAL_NAMES = {}
-function IsInInstance() return INSTANCE end
+INSTANCE_TYPE = "party"   -- "pvp" in a battleground, "arena", "raid"
+INSTANCE_SECRET = false   -- the instance type as a secret value (not seen in game; guarded anyway)
+function IsInInstance()
+    local kind = INSTANCE and INSTANCE_TYPE or "none"
+    if INSTANCE_SECRET then kind = secret(kind) end
+    return INSTANCE, kind
+end
 -- Like the real game: spell lookup by name ignores capitalization
 local function lookup(n)
     if type(n) == "number" then   -- the real API takes spell IDs too

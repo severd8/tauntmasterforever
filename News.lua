@@ -6,6 +6,9 @@ local _, ns = ...
 local TM = ns.TM
 
 TM.NEWS = {
+    { version = "1.17.0", date = "2026-11-16", items = {
+        "Hide in battlegrounds: the bars hide themselves in a battleground and come back when you leave (Layout tab).",
+    } },
     { version = "1.16.1", date = "2026-11-12", items = {
         "The command is now /tmf (or /tauntmaster), so the game's own target marker command works again.",
     } },

@@ -1,3 +1,7 @@
+## 1.17.0
+
+- New: **Hide in battlegrounds** (Layout tab, off by default). Turn it on and TauntMaster hides itself when you enter a battleground and comes back when you leave, so there's nothing to tidy away before PvP. Nameplate marks are off there too. Dungeons, raids and arenas aren't affected. If you zone in or out during a fight, the change happens as soon as the fight ends.
+
 ## 1.16.1
 
 - Changed: **the command is now `/tmf`** (or `/tauntmaster`). `/tm` belongs to the game: it's the short form of `/targetmarker`, and TauntMaster was taking it over, which broke marker macros and other addons that put raid icons on mobs. `/tm` marks targets again. Everything else is the same, just type `/tmf` instead: `/tmf show`, `/tmf share`, `/tmf news` and so on.

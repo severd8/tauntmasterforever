@@ -792,6 +792,10 @@ local function BuildLayoutTab(p)
     Switch(vis, "Pet bars", COL2, -30 - 3 * ROW, "showPets",
         { tip = "Bars for your pet and your party's pets, in a column after the party bars. Click one to taunt "
             .. "what the pet is fighting. Pets often hold mobs on purpose, so their bars don't flash." })
+    -- Beside the buttons, centred on them
+    Switch(vis, "Hide in battlegrounds", COL2, -145, "hideInBattlegrounds",
+        { tip = "Hides the bars while you're in a battleground and brings them back when you leave. "
+            .. "Entering or leaving during a fight takes effect when it ends." })
     local reset = FlatButton(vis, "Reset position", 130)
     reset:SetPoint("TOPLEFT", 12, -142)
     reset:SetScript("OnClick", function() SlashCmdList.TAUNTMASTERFOREVER("reset") end)
